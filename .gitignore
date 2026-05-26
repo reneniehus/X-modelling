@@ -1,0 +1,20 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+stan/SIR_simple.rds
+.RDataTmp
+/output/covid-forecast-hub
+/output/ari-forecast-hub
+/output/flu-forecast-hub
+*.PROFILE
+packrat/lib*/
+output/RespiCompass_round1.Rdata
+output/rep_list.Rdata
+output/RespiCompass_round1.Rdata
+# Generated large model output files
+output/rep_list.Rdata
+
+# R session files
+.Rhistory
+.Rproj.user/
