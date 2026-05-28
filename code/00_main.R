@@ -32,4 +32,4 @@ if (F) send_report(params)
 
 # ---- |- The end
 # (temporary code for any quick checking)
-data$epi$date_epilist_created
+data$epi$erviss_ili_ari$date %>% range()
