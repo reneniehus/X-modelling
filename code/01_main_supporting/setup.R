@@ -164,16 +164,16 @@ options(stringsAsFactors = FALSE,
 ### Settings for plotting ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # ECDC Font
-if ("Tahoma" %in% extrafont::fonts()) {
-  FONT <- "Tahoma"
-  suppressMessages(extrafont::loadfonts(device = "win"))
-} else if (Sys.info()["sysname"] == "Windows") {
-  suppressMessages(extrafont::font_import(pattern = 'tahoma', prompt = FALSE))
-  suppressMessages(extrafont::loadfonts(device = "win"))
-  FONT <- "Tahoma"
-} else {
-  FONT <- NULL
-}
+# if ("Tahoma" %in% extrafont::fonts()) {
+#   FONT <- "Tahoma"
+#   suppressMessages(extrafont::loadfonts(device = "win"))
+# } else if (Sys.info()["sysname"] == "Windows") {
+#   suppressMessages(extrafont::font_import(pattern = 'tahoma', prompt = FALSE))
+#   suppressMessages(extrafont::loadfonts(device = "win"))
+#   FONT <- "Tahoma"
+# } else {
+#   FONT <- NULL
+# }
 
 cleancat <- function(astring, width=80) {
   # Reserves a line of 80 (default) characters
