@@ -36,4 +36,4 @@ if (F) send_report(params)
 
 # ---- |- The end
 # (temporary code for any quick checking)
-data$epi$erviss_ili_ari$date %>% range()
+models_in$data_all_season
