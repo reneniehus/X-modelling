@@ -13,7 +13,6 @@ source("code/01_main_supporting/load_flu_data.R")
 source("code/01_main_supporting/run_model.R")
 source("code/01_main_supporting/process_and_save.R")
 source("code/01_main_supporting/send_report.R")
-source("code/06_sandbox/generate_ili_epi_test.R")
 
 # ---- |-load flu data ----
 data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the data # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
@@ -33,3 +32,4 @@ if (F) send_report(params)
 
 # ---- |- The end
 # (temporary code for any quick checking)
+data$epi$date_epilist_created
