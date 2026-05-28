@@ -10,6 +10,7 @@ source("code/02_settings/settings_version0.R"); params=settings() # settings_ver
 # ---- |-sourcing support scripts ----
 source("code/01_main_supporting/flu_functions.R")
 source("code/01_main_supporting/load_flu_data.R")
+source("code/01_main_supporting/gen_model_input.R")
 source("code/01_main_supporting/run_model.R")
 source("code/01_main_supporting/process_and_save.R")
 source("code/01_main_supporting/send_report.R")
@@ -20,7 +21,7 @@ data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the d
 # ---- |-generate model inputs ----
 models_in = gen_model_input( params, data )
 # ---- |-run flu models----
-models_out = run_model( params, data ) # runs the model scripts
+models_out = run_model( params, data , models_in ) # runs the model scripts
 
 # ---- |-process and save model output ----
 if (F) rep_list = process_and_save( params, data, models_out, save_submission=params$save_submission );  # processing the model output, with figures and saves

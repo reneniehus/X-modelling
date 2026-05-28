@@ -21,7 +21,9 @@ settings = function() {
   params$ve_spread = 0.20 # vaccine effect on onward spread when vaccinated individual is infected
   
   # ---- |-Data ----
-  params$latest_start_year = 2024 # if the last partly/fully observed season is 2024/25, put 2024
+  params$latest_start_year = 2025 # if the last partly/fully observed season is 2024/25, put 2024
+  params$season_start_monthday = "-08-01" # initial date of for SIR initiation
+  params$season_end_monthday = "-07-31" # end date of SIR process
   
   # ---- |-Simulations ----
   params$simulation_seed = 12

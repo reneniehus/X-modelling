@@ -1,4 +1,4 @@
-run_model = function( params=NULL , data=NULL ){
+run_model = function( params=NULL , data=NULL , models_in=NULL ){
   t1 <- Sys.time()
   
   # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
