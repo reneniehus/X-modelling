@@ -184,20 +184,20 @@ cleancat <- function(astring, width=80) {
 }
 
 # Theme (got this from WNV repo)
-.plottheme <- ggplot2::theme(axis.text = ggplot2::element_text(size = 8, family = FONT),
-                             axis.title = ggplot2::element_text(size = 9, family = FONT),
-                             axis.line = ggplot2::element_line(colour = "black"),
-                             axis.line.x = ggplot2::element_blank(),
-                             # --- Setting the background
-                             panel.grid.major = ggplot2::element_blank(),
-                             panel.grid.minor = ggplot2::element_blank(),
-                             panel.background = ggplot2::element_blank(),
-                             # --- Setting the legend
-                             legend.position = "right",
-                             legend.title = ggplot2::element_blank(),
-                             legend.text = ggplot2::element_text(size = 8, family = FONT),
-                             legend.key.width = ggplot2::unit(0.8, "cm"),
-                             legend.key.size = ggplot2::unit(0.4, "cm"))
+# .plottheme <- ggplot2::theme(axis.text = ggplot2::element_text(size = 8, family = FONT),
+#                              axis.title = ggplot2::element_text(size = 9, family = FONT),
+#                              axis.line = ggplot2::element_line(colour = "black"),
+#                              axis.line.x = ggplot2::element_blank(),
+#                              # --- Setting the background
+#                              panel.grid.major = ggplot2::element_blank(),
+#                              panel.grid.minor = ggplot2::element_blank(),
+#                              panel.background = ggplot2::element_blank(),
+#                              # --- Setting the legend
+#                              legend.position = "right",
+#                              legend.title = ggplot2::element_blank(),
+#                              legend.text = ggplot2::element_text(size = 8, family = FONT),
+#                              legend.key.width = ggplot2::unit(0.8, "cm"),
+#                              legend.key.size = ggplot2::unit(0.4, "cm"))
 
 # amazing: overriding function defaults
 geom_interval <- function(...) ggdist::geom_interval(...,alpha=0.4)
