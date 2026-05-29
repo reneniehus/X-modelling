@@ -136,13 +136,25 @@ load_flu_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_o
     
     vax = list(
       data_vax = data_vax %>% mutate(vaccine_coverage=vaccine_coverage/100) %>% pivot_wider(names_from = "scenario", values_from = vaccine_coverage),
-      data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ) %>% mutate(season = str_replace(season, "-", "/")),
-      data_vax_history_all = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ) %>% mutate(season = str_replace(season, "-", "/"))
+      data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=suppressWarnings(as.numeric(vaccine_coverage))/100 ) %>% mutate(season = str_replace(season, "-", "/")),
+      data_vax_history_all = data_vax_hist_all %>% mutate(vaccine_coverage=suppressWarnings(as.numeric(vaccine_coverage))/100 ) %>% mutate(season = str_replace(season, "-", "/"))
     )
     save(vax,file=here("output/vax.Rdata"))
     
   } else { load(file=here("output/vax.Rdata")) }
   
+  # Older cached vax.Rdata files may predate data_vax_history_all loading.
+  # If the richer local file is present, refresh this in memory without
+  # requiring an online download or rewriting the cache.
+  if (file.exists(here("data/vax_flu_history_all.csv"))) {
+    local_vax_history_all <- read_csv(file=here("data/vax_flu_history_all.csv"), show_col_types = F) %>%
+      mutate(vaccine_coverage=suppressWarnings(as.numeric(vaccine_coverage))/100) %>%
+      mutate(season = str_replace(season, "-", "/"))
+    if (is.null(vax$data_vax_history_all) || nrow(local_vax_history_all) > nrow(vax$data_vax_history_all)) {
+      vax$data_vax_history_all <- local_vax_history_all
+    }
+  }
+
   # adding to data 
   data$vax = vax
   

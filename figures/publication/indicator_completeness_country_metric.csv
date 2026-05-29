@@ -1,0 +1,176 @@
+country_short,metric,observed_fraction,n_seasons
+AT,ARI consultation rate,0,4
+AT,ILI consultation rate,0.5081277213352685,4
+AT,ILI+ (ERVISS nonsentinel),0.4312046444121916,4
+AT,ILI+ (ERVISS sentinel),0.42158925979680695,4
+AT,ILI+ (RespiCompass),0.290910740203193,4
+AT,Influenza positivity (combined),0.6883164005805515,4
+AT,Influenza tests (combined),1,4
+BE,ARI consultation rate,1,4
+BE,ILI consultation rate,1,4
+BE,ILI+ (ERVISS nonsentinel),0.019230769230769232,4
+BE,ILI+ (ERVISS sentinel),0.846244557329463,4
+BE,ILI+ (RespiCompass),0.5347423802612482,4
+BE,Influenza positivity (combined),0.9472060957910015,4
+BE,Influenza tests (combined),1,4
+CZ,ARI consultation rate,1,4
+CZ,ILI consultation rate,1,4
+CZ,ILI+ (ERVISS nonsentinel),0.9375,4
+CZ,ILI+ (ERVISS sentinel),0.8366291727140784,4
+CZ,ILI+ (RespiCompass),0.602322206095791,4
+CZ,Influenza positivity (combined),0.9711538461538461,4
+CZ,Influenza tests (combined),1,4
+DK,ARI consultation rate,0,4
+DK,ILI consultation rate,0.9807692307692308,4
+DK,ILI+ (ERVISS nonsentinel),0.9807692307692308,4
+DK,ILI+ (ERVISS sentinel),0.9663461538461539,4
+DK,ILI+ (RespiCompass),0.6402394775036284,4
+DK,Influenza positivity (combined),1,4
+DK,Influenza tests (combined),1,4
+EE,ARI consultation rate,0.47030116110304787,4
+EE,ILI consultation rate,0.9570936139332366,4
+EE,ILI+ (ERVISS nonsentinel),0.8229317851959361,4
+EE,ILI+ (ERVISS sentinel),0.9186320754716981,4
+EE,ILI+ (RespiCompass),0.654843976777939,4
+EE,Influenza positivity (combined),0.9615384615384616,4
+EE,Influenza tests (combined),1,4
+ES,ARI consultation rate,1,3
+ES,ILI consultation rate,0.610062893081761,3
+ES,ILI+ (ERVISS nonsentinel),0.610062893081761,3
+ES,ILI+ (ERVISS sentinel),0.610062893081761,3
+ES,ILI+ (RespiCompass),0,3
+ES,Influenza positivity (combined),0.9423076923076923,3
+ES,Influenza tests (combined),1,3
+FI,ARI consultation rate,0.9171504596032898,3
+FI,ILI consultation rate,0.9171504596032898,3
+FI,ILI+ (ERVISS nonsentinel),0.3517174649250121,3
+FI,ILI+ (ERVISS sentinel),0.46081277213352684,3
+FI,ILI+ (RespiCompass),0.3517174649250121,3
+FI,Influenza positivity (combined),0.5755926463473633,3
+FI,Influenza tests (combined),1,3
+FR,ARI consultation rate,0.7464622641509434,4
+FR,ILI consultation rate,0.7464622641509434,4
+FR,ILI+ (ERVISS nonsentinel),0.741654571843251,4
+FR,ILI+ (ERVISS sentinel),0.6602866473149491,4
+FR,ILI+ (RespiCompass),0.5112481857764877,4
+FR,Influenza positivity (combined),0.9951923076923077,4
+FR,Influenza tests (combined),1,4
+GR,ARI consultation rate,0,4
+GR,ILI consultation rate,0.1980769230769231,4
+GR,ILI+ (ERVISS nonsentinel),0.10128809869375907,4
+GR,ILI+ (ERVISS sentinel),0.1701923076923077,4
+GR,ILI+ (RespiCompass),0.11170174165457183,4
+GR,Influenza positivity (combined),0.8653846153846154,4
+GR,Influenza tests (combined),1,4
+HR,ARI consultation rate,0,4
+HR,ILI consultation rate,0.7988026124818578,4
+HR,ILI+ (ERVISS nonsentinel),0.7843795355587808,4
+HR,ILI+ (ERVISS sentinel),0.10576923076923078,4
+HR,ILI+ (RespiCompass),0.4873911465892598,4
+HR,Influenza positivity (combined),0.9807692307692308,4
+HR,Influenza tests (combined),1,4
+HU,ARI consultation rate,0.09268867924528301,4
+HU,ILI consultation rate,0.12441944847605224,4
+HU,ILI+ (ERVISS nonsentinel),0.0429245283018868,4
+HU,ILI+ (ERVISS sentinel),0.09379535558780842,4
+HU,ILI+ (RespiCompass),0.06591074020319304,4
+HU,Influenza positivity (combined),0.6510341074020319,4
+HU,Influenza tests (combined),1,4
+IE,ARI consultation rate,0.21153846153846154,4
+IE,ILI consultation rate,0.9915094339622641,4
+IE,ILI+ (ERVISS nonsentinel),0.9915094339622641,4
+IE,ILI+ (ERVISS sentinel),0.9915094339622641,4
+IE,ILI+ (RespiCompass),0.6990566037735849,4
+IE,Influenza positivity (combined),0.9952830188679245,4
+IE,Influenza tests (combined),1,4
+IS,ARI consultation rate,0.04807692307692308,4
+IS,ILI consultation rate,0.831222786647315,4
+IS,ILI+ (ERVISS nonsentinel),0.6926161103047895,4
+IS,ILI+ (ERVISS sentinel),0,4
+IS,ILI+ (RespiCompass),0.4486574746008708,4
+IS,Influenza positivity (combined),0.9951923076923077,4
+IS,Influenza tests (combined),1,4
+IT,ARI consultation rate,0,4
+IT,ILI consultation rate,0.5312046444121916,4
+IT,ILI+ (ERVISS nonsentinel),0.454644412191582,4
+IT,ILI+ (ERVISS sentinel),0.4161828737300436,4
+IT,ILI+ (RespiCompass),0.30551523947750364,4
+IT,Influenza positivity (combined),0.5891690856313498,4
+IT,Influenza tests (combined),1,4
+LT,ARI consultation rate,0.5650761973875181,4
+LT,ILI consultation rate,0.5650761973875181,4
+LT,ILI+ (ERVISS nonsentinel),0.3339804063860668,4
+LT,ILI+ (ERVISS sentinel),0.2527213352685051,4
+LT,ILI+ (RespiCompass),0.1373367198838897,4
+LT,Influenza positivity (combined),0.8036103047895501,4
+LT,Influenza tests (combined),1,4
+LU,ARI consultation rate,0.1980769230769231,4
+LU,ILI consultation rate,0.1980769230769231,4
+LU,ILI+ (ERVISS nonsentinel),0.01730769230769231,4
+LU,ILI+ (ERVISS sentinel),0.19134615384615386,4
+LU,ILI+ (RespiCompass),0.1319121915820029,4
+LU,Influenza positivity (combined),0.9903846153846154,4
+LU,Influenza tests (combined),1,4
+LV,ARI consultation rate,0.637155297532656,3
+LV,ILI consultation rate,0.637155297532656,3
+LV,ILI+ (ERVISS nonsentinel),0.5803096274794388,3
+LV,ILI+ (ERVISS sentinel),0.06410256410256411,3
+LV,ILI+ (RespiCompass),0.5752781809385583,3
+LV,Influenza positivity (combined),0.8295839380745041,3
+LV,Influenza tests (combined),1,3
+MT,ARI consultation rate,0,3
+MT,ILI consultation rate,0.8731253023705854,3
+MT,ILI+ (ERVISS nonsentinel),0.7962022254475085,3
+MT,ILI+ (ERVISS sentinel),0.06398161586840832,3
+MT,ILI+ (RespiCompass),0.46335268505079824,3
+MT,Influenza positivity (combined),0.9423076923076923,3
+MT,Influenza tests (combined),1,3
+NL,ARI consultation rate,0.2932692307692308,4
+NL,ILI consultation rate,1,4
+NL,ILI+ (ERVISS nonsentinel),0,4
+NL,ILI+ (ERVISS sentinel),0.9855769230769231,4
+NL,ILI+ (RespiCompass),0.6931240928882438,4
+NL,Influenza positivity (combined),1,4
+NL,Influenza tests (combined),1,4
+NO,ARI consultation rate,0,4
+NO,ILI consultation rate,0.6674528301886793,4
+NO,ILI+ (ERVISS nonsentinel),0.6674528301886793,4
+NO,ILI+ (ERVISS sentinel),0.5761066763425254,4
+NO,ILI+ (RespiCompass),0.5296625544267054,4
+NO,Influenza positivity (combined),1,4
+NO,Influenza tests (combined),1,4
+PL,ARI consultation rate,0,4
+PL,ILI consultation rate,0.9903846153846154,4
+PL,ILI+ (ERVISS nonsentinel),0.8896044992743106,4
+PL,ILI+ (ERVISS sentinel),0.7895500725689405,4
+PL,ILI+ (RespiCompass),0.5686683599419449,4
+PL,Influenza positivity (combined),0.9520137880986937,4
+PL,Influenza tests (combined),1,4
+PT,ARI consultation rate,0.7884615384615384,2
+PT,ILI consultation rate,0.7884615384615384,2
+PT,ILI+ (ERVISS nonsentinel),0.7019230769230769,2
+PT,ILI+ (ERVISS sentinel),0.6346153846153846,2
+PT,ILI+ (RespiCompass),0.6346153846153846,2
+PT,Influenza positivity (combined),0.9134615384615384,2
+PT,Influenza tests (combined),1,2
+RO,ARI consultation rate,0.9618105950653121,4
+RO,ILI consultation rate,0.9618105950653121,4
+RO,ILI+ (ERVISS nonsentinel),0.3097786647314949,4
+RO,ILI+ (ERVISS sentinel),0.056785195936139336,4
+RO,ILI+ (RespiCompass),0.28093251088534105,4
+RO,Influenza positivity (combined),0.5595065312046444,4
+RO,Influenza tests (combined),1,4
+SI,ARI consultation rate,1,4
+SI,ILI consultation rate,1,4
+SI,ILI+ (ERVISS nonsentinel),1,4
+SI,ILI+ (ERVISS sentinel),0.9903846153846154,4
+SI,ILI+ (RespiCompass),0.6979317851959361,4
+SI,Influenza positivity (combined),1,4
+SI,Influenza tests (combined),1,4
+SK,ARI consultation rate,0.9990384615384615,4
+SK,ILI consultation rate,1,4
+SK,ILI+ (ERVISS nonsentinel),0.402666908563135,4
+SK,ILI+ (ERVISS sentinel),0.48321843251088537,4
+SK,ILI+ (RespiCompass),0.1826923076923077,4
+SK,Influenza positivity (combined),0.9807692307692307,4
+SK,Influenza tests (combined),1,4
