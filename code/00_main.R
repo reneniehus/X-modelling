@@ -24,17 +24,12 @@ models_in = gen_model_input( params, data )
 models_out = run_model( params, data , models_in ) # runs the model scripts
 
 # ---- |-process and save model output ----
-if (F) rep_list = process_and_save( params, data, models_out, save_submission=params$save_submission );  # processing the model output, with figures and saves
 
 # ---- |-report ----
-if (F) rmarkdown::render("code/03_report/report_overview.Rmd") # requires: params, data , rep_list
 
-# ---- |-Send ----
-if (F) send_report(params)
+# ---- |-Run special analyses ("code/04_special_analyses/")
 
-# ---- |- Run special analyses ("code/04_special_analyses/")
-
-# ---- |- The end
+# ---- |-The end
 # (temporary code for any quick checking)
 models_in$data_timeseries_long 
 models_in$data_season_summary
