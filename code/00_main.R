@@ -20,6 +20,7 @@ data = load_flu_data( params, regenerate = F, new_from_online = F) # loads the d
 
 # ---- |-generate model inputs ----
 models_in = gen_model_input( params, data )
+eyeballing(models_in, params, data, countries=NULL, seasons=NULL, interactive=F)
 # ---- |-run flu models----
 models_out = run_model( params, data , models_in ) # runs the model scripts
 
@@ -36,4 +37,5 @@ if (F) send_report(params)
 
 # ---- |- The end
 # (temporary code for any quick checking)
-models_in$data_all_season
+models_in$data_timeseries_long 
+models_in$data_season_summary
