@@ -36,4 +36,7 @@ if (F) send_report(params)
 
 # ---- |- The end
 # (temporary code for any quick checking)
-models_in$data_all_season
+models_in$data_timeseries_long 
+models_in$data_season_summary
+
+eyeballing(models_in, params, data, countries=NULL, seasons=NULL, interactive=F)
