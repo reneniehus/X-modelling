@@ -80,6 +80,228 @@ rep_warning_wed = function(df_rep,ind_name){
   return(invisible(NULL))
 }
 
+
+season_start_year_from_label <- function(season) {
+  as.integer(stringr::str_sub(season, 1, 4))
+}
+
+add_season_time_columns <- function(df, params=NULL) {
+  if (!"date" %in% names(df)) df$date <- as.Date(NA)
+  df$date <- as.Date(df$date)
+  if (!"season" %in% names(df)) df$season <- NA_character_
+  season_start_year <- season_start_year_from_label(df$season)
+  season_start_date <- lubridate::ymd(paste0(season_start_year, params$season_start_monthday))
+  df %>% mutate(
+    season_start_year = season_start_year,
+    season_start_date = season_start_date,
+    season_day = as.integer(date - season_start_date) + 1L,
+    season_week = as.integer(floor((season_day - 1L) / 7L) + 1L),
+    iso_week = ifelse(is.na(date), NA_character_, ISOweek::ISOweek(date))
+  )
+}
+
+normalise_indicator_label <- function(indicator) {
+  case_when(
+    indicator == "ILIconsultationrate" ~ "ILI consultation rate",
+    indicator == "ARIconsultationrate" ~ "ARI consultation rate",
+    indicator == "ili_plus" ~ "ILI+",
+    indicator == "positivity" ~ "Influenza positivity",
+    indicator == "detections" ~ "Influenza detections",
+    indicator == "tests" ~ "Influenza tests",
+    indicator == "vaccine_coverage" ~ "Vaccination coverage",
+    TRUE ~ indicator
+  )
+}
+
+normalise_indicator_unit <- function(indicator) {
+  case_when(
+    indicator %in% c("positivity", "vaccine_coverage") ~ "proportion",
+    indicator %in% c("detections", "tests") ~ "count",
+    indicator %in% c("ILIconsultationrate", "ARIconsultationrate", "ili_plus") ~ "rate",
+    TRUE ~ NA_character_
+  )
+}
+
+prepare_timeseries_piece <- function(df, params=NULL, source=NULL, stream=NULL, value_col="value", indicator_default=NULL) {
+  if (!"date" %in% names(df)) df$date <- as.Date(NA)
+  if (!"target" %in% names(df) & "indicator" %in% names(df)) df$target <- df$indicator
+  if (!"target" %in% names(df)) df$target <- indicator_default
+  if (is.null(df$target)) df$target <- NA_character_
+  if (!"agegroup" %in% names(df)) df$agegroup <- "age_total"
+  if (!"pathogentype" %in% names(df)) df$pathogentype <- NA_character_
+  if (!"pathogensubtype" %in% names(df)) df$pathogensubtype <- NA_character_
+  if (!value_col %in% names(df)) df[[value_col]] <- NA_real_
+  df %>%
+    transmute(
+      country_short,
+      season,
+      date=as.Date(date),
+      indicator=target,
+      indicator_label=normalise_indicator_label(target),
+      source=source,
+      stream=stream,
+      scenario=NA_character_,
+      agegroup,
+      pathogentype,
+      pathogensubtype,
+      value=as.numeric(.data[[value_col]]),
+      unit=normalise_indicator_unit(target),
+      temporal_resolution="weekly",
+      observed=!is.na(value)
+    ) %>%
+    add_season_time_columns(params=params)
+}
+
+unnest_season_stream <- function(data_all_season, nested_col) {
+  data_all_season %>%
+    select(country_short, season, all_of(nested_col)) %>%
+    tidyr::unnest(cols=all_of(nested_col))
+}
+
+make_data_timeseries_long <- function(data_all_season, data=NULL, params=NULL) {
+  pieces <- list(
+    prepare_timeseries_piece(unnest_season_stream(data_all_season, "inc_iliari"), params=params, source="ERVISS", stream="ili_ari"),
+    prepare_timeseries_piece(unnest_season_stream(data_all_season, "typing_sentinel"), params=params, source="ERVISS", stream="sentinel_typing"),
+    prepare_timeseries_piece(unnest_season_stream(data_all_season, "typing_nonsentinel"), params=params, source="ERVISS", stream="nonsentinel_typing"),
+    prepare_timeseries_piece(unnest_season_stream(data_all_season, "typing_combined"), params=params, source="ERVISS", stream="sentinel_plus_nonsentinel_typing", value_col="value_add_narm"),
+    prepare_timeseries_piece(unnest_season_stream(data_all_season, "respicompass_ili_plus"), params=params, source="RespiCompass", stream="ili_plus"),
+    prepare_timeseries_piece(unnest_season_stream(data_all_season, "erviss_ili_plus_sentinel"), params=params, source="ERVISS", stream="ili_plus_sentinel", indicator_default="ili_plus"),
+    prepare_timeseries_piece(unnest_season_stream(data_all_season, "erviss_ili_plus_nonsentinel"), params=params, source="ERVISS", stream="ili_plus_nonsentinel", indicator_default="ili_plus")
+  )
+  long_df <- bind_rows(pieces)
+  if (!is.null(data$vax$data_vax_history)) {
+    vax_history <- data$vax$data_vax_history %>%
+      transmute(
+        country_short=iso2_code,
+        season,
+        date=as.Date(NA),
+        indicator="vaccine_coverage",
+        indicator_label=normalise_indicator_label(indicator),
+        source=source,
+        stream="vaccination_history_65plus",
+        scenario="observed_history",
+        agegroup=target_group,
+        pathogentype=NA_character_,
+        pathogensubtype=NA_character_,
+        value=as.numeric(vaccine_coverage),
+        unit=normalise_indicator_unit(indicator),
+        temporal_resolution="seasonal",
+        observed=!is.na(value)
+      ) %>%
+      add_season_time_columns(params=params)
+    long_df <- bind_rows(long_df, vax_history)
+  }
+  if (!is.null(data$vax$data_vax)) {
+    vax_scenarios <- data$vax$data_vax %>%
+      pivot_longer(cols=c("higher_vax_coverage", "lower_vax_coverage", "no_vaccination"),
+                   names_to="scenario", values_to="vaccine_coverage") %>%
+      transmute(
+        country_short=iso2_code,
+        season=paste0(params$latest_start_year, "/", params$latest_start_year + 1),
+        date=as.Date(NA),
+        indicator="vaccine_coverage",
+        indicator_label=normalise_indicator_label(indicator),
+        source="RespiCompass",
+        stream="vaccination_scenario",
+        scenario,
+        agegroup=target_group,
+        pathogentype=NA_character_,
+        pathogensubtype=NA_character_,
+        value=as.numeric(vaccine_coverage),
+        unit=normalise_indicator_unit(indicator),
+        temporal_resolution="seasonal",
+        observed=!is.na(value)
+      ) %>%
+      add_season_time_columns(params=params)
+    long_df <- bind_rows(long_df, vax_scenarios)
+  }
+  long_df %>% arrange(country_short, season, source, stream, indicator, scenario, agegroup, date)
+}
+
+summarise_timeseries_group <- function(df) {
+  df %>% summarise(
+    n_rows=n(),
+    n_observed=sum(observed, na.rm=TRUE),
+    observed_fraction=mean(observed, na.rm=TRUE),
+    sum_value=sum(value, na.rm=TRUE),
+    mean_value=mean(value, na.rm=TRUE),
+    max_value=ifelse(all(is.na(value)), NA_real_, max(value, na.rm=TRUE)),
+    peak_date=ifelse(all(is.na(value)) | all(is.na(date)), as.Date(NA), date[which.max(replace_na(value, -Inf))]),
+    first_date=ifelse(all(is.na(date)), as.Date(NA), min(date, na.rm=TRUE)),
+    last_date=ifelse(all(is.na(date)), as.Date(NA), max(date, na.rm=TRUE)),
+    .groups="drop"
+  ) %>% mutate(
+    peak_date=as.Date(peak_date, origin="1970-01-01"),
+    first_date=as.Date(first_date, origin="1970-01-01"),
+    last_date=as.Date(last_date, origin="1970-01-01")
+  )
+}
+
+make_data_season_summary <- function(data_all_season, data_timeseries_long, data=NULL, params=NULL) {
+  age_specific <- data_timeseries_long %>%
+    group_by(country_short, season, indicator, indicator_label, source, stream, scenario, agegroup, unit, temporal_resolution) %>%
+    summarise_timeseries_group() %>%
+    mutate(summary_level="agegroup")
+  all_agegroups <- data_timeseries_long %>%
+    group_by(country_short, season, indicator, indicator_label, source, stream, scenario, unit, temporal_resolution) %>%
+    summarise_timeseries_group() %>%
+    mutate(agegroup="all_agegroups", summary_level="all_agegroups")
+  bind_rows(age_specific, all_agegroups) %>%
+    select(country_short, season, indicator, indicator_label, source, stream, scenario, agegroup, summary_level, unit, temporal_resolution, everything()) %>%
+    arrange(country_short, season, source, stream, indicator, summary_level, agegroup)
+}
+
+eyeballing <- function(models_in, params=NULL, data=NULL, countries=NULL, seasons=NULL, interactive=TRUE) {
+  data_timeseries_long <- models_in$data_timeseries_long
+  data_season_summary <- models_in$data_season_summary
+  if (is.null(countries)) countries <- params$run_countries
+  if (is.null(countries) || length(countries)==0) countries <- data_timeseries_long$country_short %>% unique() %>% head(6)
+  if (is.null(seasons)) seasons <- data_timeseries_long$season %>% unique()
+  plot_data <- data_timeseries_long %>% filter(country_short %in% countries, season %in% seasons)
+  p_indicators <- plot_data %>%
+    filter(temporal_resolution=="weekly", agegroup=="age_total", indicator %in% c("ILIconsultationrate", "ARIconsultationrate", "ili_plus", "positivity")) %>%
+    ggplot(aes(date, value, color=indicator_label, linetype=stream)) +
+    geom_line(na.rm=TRUE) +
+    facet_grid(country_short ~ season, scales="free_y") +
+    labs(title="Flu indicator dynamics by country and season", x=NULL, y="Value", color="Indicator", linetype="Stream") +
+    theme_minimal()
+  p_quality <- data_season_summary %>%
+    filter(country_short %in% countries, season %in% seasons, summary_level=="all_agegroups", indicator %in% c("ILIconsultationrate", "ARIconsultationrate", "ili_plus", "positivity", "tests")) %>%
+    ggplot(aes(season, observed_fraction, fill=indicator_label)) +
+    geom_col(position="dodge") +
+    facet_grid(country_short ~ stream) +
+    coord_cartesian(ylim=c(0, 1)) +
+    labs(title="Observed fraction / completeness by season", x=NULL, y="Observed fraction", fill="Indicator") +
+    theme_minimal() +
+    theme(axis.text.x=element_text(angle=45, hjust=1))
+  p_testing <- plot_data %>%
+    filter(temporal_resolution=="weekly", agegroup=="age_total", indicator %in% c("tests", "detections", "positivity"), stream %in% c("sentinel_typing", "nonsentinel_typing", "sentinel_plus_nonsentinel_typing")) %>%
+    ggplot(aes(date, value, color=stream)) +
+    geom_line(na.rm=TRUE) +
+    facet_grid(indicator_label + country_short ~ season, scales="free_y") +
+    labs(title="Influenza testing, detections and positivity", x=NULL, y="Value", color="Stream") +
+    theme_minimal()
+  p_age <- plot_data %>%
+    filter(temporal_resolution=="weekly", indicator %in% c("ILIconsultationrate", "ARIconsultationrate", "ili_plus"), agegroup != "age_total") %>%
+    ggplot(aes(date, value, color=agegroup)) +
+    geom_line(na.rm=TRUE) +
+    facet_grid(indicator_label + country_short ~ season, scales="free_y") +
+    labs(title="Age-specific flu indicators", x=NULL, y="Value", color="Age group") +
+    theme_minimal()
+  plots <- list(indicator_dynamics=p_indicators, data_quality=p_quality, testing_dynamics=p_testing, age_dynamics=p_age)
+  interactive_plots <- NULL
+  if (interactive && requireNamespace("plotly", quietly=TRUE)) {
+    interactive_plots <- purrr::map(plots, plotly::ggplotly)
+  }
+  list(
+    plots=plots,
+    interactive_plots=interactive_plots,
+    data_used=plot_data,
+    note=if (is.null(interactive_plots)) "Install/load plotly to receive interactive ggplotly versions of the plots." else "Interactive plotly versions are available in interactive_plots."
+  )
+}
+
+
 data_into_all_season = function(data,params,withforce=F){
   # function that loops through countries and seasons and makes all useful data available through a list (avoid model choices here)
   
