@@ -29,7 +29,7 @@ settings = function() {
   params$simulation_seed = 12
   
   # ---- |-Countries ----
-  params$run_countries = "IT"
+  params$run_countries = c("IT", "AT", "BE", "BG", "HR")
   
   # ---- |-Model-specific  settings ----
   
