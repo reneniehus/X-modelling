@@ -16,7 +16,7 @@ source("code/01_main_supporting/process_and_save.R")
 source("code/01_main_supporting/send_report.R")
 
 # ---- |-load flu data ----
-data = load_data( params, regenerate = T, new_from_online = T) # loads the data # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
+data = load_data( params, regenerate = F, new_from_online = F) # loads the data # regenerate=T recreates the data lists, new_from_online=T uses the online versions for recreation
 
 # ---- |-generate model inputs ----
 models_in = gen_model_input( params, data )
