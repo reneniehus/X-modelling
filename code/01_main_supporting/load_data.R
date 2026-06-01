@@ -1,162 +1,171 @@
-# 1: defining functions that load each data stream
-# 2: define a mother function that calls each data stream function
+# 1: small helpers shared by the data-loading functions
+# 2: defining functions that load each data stream
+# 3: define a mother function that calls each data stream function
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+### Helpers shared across the data-loading functions ##########
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+# ---- |-recode the ERVISS age labels to our age-group labels ----
+recode_age = function(age){
+  case_when(
+    age == "0-4"   ~ "age_00_04",
+    age == "5-14"  ~ "age_05_14",
+    age == "15-64" ~ "age_15_64",
+    age == "65+"   ~ "age_65_99",
+    age == "total" ~ "age_total",
+    age == "unk"   ~ "age_unk",
+    .default = age          # carry through any age label we have not mapped yet
+  )
+}
+
+# ---- |-standardise one raw ERVISS table ----
+# every ERVISS file shares the core columns: survtype, countryname, yearweek, indicator, age, value
+# here we (i) add an ISO-week (Wednesday) date, (ii) recode age, (iii) add the short country code,
+# then either slim down to the rate columns or keep every column.
+standardise_erviss = function(df, schema){
+  df = df %>%
+    mutate(date          = ISOweek2date(paste0(yearweek,"-3"))) %>%   # mid-week (Wednesday) date
+    mutate(age           = recode_age(age)) %>%                       # standard age-group labels (in place)
+    mutate(country_short = EU_short(countryname))                     # ISO2-style short country code
+  if (schema == "rates") {
+    # slim consultation/hospitalisation-rate schema (no pathogen breakdown) used by the SIR-type models
+    df = df %>% select(country_short, date, target=indicator, agegroup=age, value)
+  }
+  # schema == "detailed": keep every original column (pathogen / pathogentype / pathogensubtype /
+  # datasource / variant / detectableprevalence are all carried through unchanged)
+  return(df)
+}
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Defining data-loading functions for each data stream ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-load_flu_data_epi = function(data=data, params=NULL, regenerate=T , new_from_online=T){
-  
+load_data_epi = function(data=data, params=NULL, regenerate=T , new_from_online=T){
+
   file_doesnot_exist = !file.exists("output/epi.Rdata")
   if ( file_doesnot_exist|regenerate==T ) {
-    
-    if (new_from_online==T) {
-      # load data freshly from the internet
-      pr=paste("Loading epi data from github ... \n"); cat(green(pr))
-      erviss_ili_ari = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/ILIARIRates.csv",show_col_types = FALSE)
-      data_sentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/sentinelTestsDetectionsPositivity.csv",show_col_types = FALSE)
-      data_nonsentinel_detections = read_csv(file="https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/nonSentinelTestsDetections.csv",show_col_types = FALSE)
+
+    # ---- |-ERVISS file registry ----
+    # one row per dataset published in the ECDC ERVISS data folder:
+    #   https://github.com/EU-ECDC/Respiratory_viruses_weekly_data/tree/main/data
+    # to add a new ERVISS stream, simply add a row here -- the loop below does the rest.
+    #   name     : key under data$epi$<name> (used by the downstream code)
+    #   file     : exact CSV file name in the ERVISS /data folder
+    #   snapshot : local snapshot file kept in data/ (used when new_from_online==F)
+    #   schema   : "rates"    -> slim consultation/hospitalisation-rate table
+    #              "detailed" -> keep all columns (pathogen / variant / datasource kept)
+    erviss_url = "https://raw.githubusercontent.com/EU-ECDC/Respiratory_viruses_weekly_data/main/data/"
+    erviss_registry = tribble(
+      ~name,                         ~file,                                       ~snapshot,                           ~schema,
+      "erviss_ili_ari",              "ILIARIRates.csv",                           "erviss_iliari.csv",                 "rates",
+      "erviss_sari_rates",           "SARIRates.csv",                             "erviss_sari_rates.csv",             "rates",
+      "erviss_typing_sentinel",      "sentinelTestsDetectionsPositivity.csv",     "erviss_detections_sentinel.csv",    "detailed",
+      "erviss_typing_nonsentinel",   "nonSentinelTestsDetections.csv",            "erviss_detections_nonsentinel.csv", "detailed",
+      "erviss_typing_sari",          "SARITestsDetectionsPositivity.csv",         "erviss_detections_sari.csv",        "detailed",
+      "erviss_flu_type_subtype",     "activityFluTypeSubtype.csv",                "erviss_flu_type_subtype.csv",       "detailed",
+      "erviss_severity_nonsentinel", "nonSentinelSeverity.csv",                   "erviss_severity_nonsentinel.csv",   "detailed",
+      "erviss_sequencing",           "sequencingVolumeDetectablePrevalence.csv",  "erviss_sequencing.csv",             "detailed",
+      "erviss_variants",             "variants.csv",                              "erviss_variants.csv",               "detailed"
+    )
+
+    # ---- |-load + standardise every ERVISS stream ----
+    epi = list( date_epilist_created = today() )    # initiate the epi list with a creation time-stamp
+    for (i in seq_len(nrow(erviss_registry))) {     # i = 1
+      reg_i         = erviss_registry[i,]
+      snapshot_path = here("data", reg_i$snapshot)
+      # fetch online when asked to, or when the local snapshot is missing (self-bootstrapping)
+      fetch_online  = new_from_online==T | !file.exists(snapshot_path)
+      if (fetch_online) {
+        pr=paste0("Loading ERVISS '",reg_i$name,"' from github ... \n"); cat(green(pr))
+        raw_i = read_csv(file=paste0(erviss_url, reg_i$file), show_col_types = FALSE)
+        raw_i %>% write_csv(file=snapshot_path)     # keep / refresh the local snapshot
+      } else {
+        pr=paste0("Loading ERVISS '",reg_i$name,"' from disk ... \n"); cat(green(pr))
+        raw_i = read_csv(file=snapshot_path, show_col_types = FALSE)
+      }
+      # add date, recode age, add country code (and slim down if it is a rate table)
+      epi[[reg_i$name]] = standardise_erviss(raw_i, schema=reg_i$schema)
+    }
+
+    # ---- |-RespiCompass ili_plus (not an ERVISS file, kept alongside the epi streams) ----
+    iliplus_snapshot = here("data/data_respicompass_iliplus.csv")
+    if (new_from_online==T | !file.exists(iliplus_snapshot)) {
+      pr=paste("Loading RespiCompass ili_plus from github ... \n"); cat(green(pr))
       data_respicompass_iliplus = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/target-data/influenza/ili_plus.csv",show_col_types = FALSE)
-      # save locally
-      erviss_ili_ari %>% write_csv(file=here("data/erviss_iliari_snapshot_2024-05-24.csv"))
-      data_sentinel_detections %>% write_csv(file=here("data/erviss_detections_sentinel_snapshot_2024-05-24.csv"))
-      data_nonsentinel_detections %>% write_csv(file=here("data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv"))
-      data_respicompass_iliplus %>% write_csv(file=here("data/data_respicompass_iliplus.csv"))
+      data_respicompass_iliplus %>% write_csv(file=iliplus_snapshot)
+    } else {
+      pr=paste("Loading RespiCompass ili_plus from disk ... \n"); cat(green(pr))
+      data_respicompass_iliplus = read_csv(file=iliplus_snapshot,show_col_types = FALSE)
     }
-    if (new_from_online==F) {
-      pr=paste("Loading epi data from disk ... \n"); cat(green(pr))
-      # load data from local storage
-      erviss_ili_ari = read_csv(file=here("data/erviss_iliari_snapshot_2024-05-24.csv"),show_col_types = FALSE)
-      data_sentinel_detections = read_csv(file=here("data/erviss_detections_sentinel_snapshot_2024-05-24.csv"),show_col_types = FALSE)
-      data_nonsentinel_detections = read_csv(file=here("data/erviss_detections_nonsentinel_snapshot_2024-05-24.csv"),show_col_types = FALSE)
-      data_respicompass_iliplus = read_csv(file=here("data/data_respicompass_iliplus.csv"),show_col_types = FALSE)
-    }
-    
-    erviss_ili_ari = erviss_ili_ari %>% 
-      mutate(date=ISOweek2date(paste0(yearweek,"-3"))) %>% 
-      mutate(age = case_when(
-        age == "0-4" ~ "age_00_04",
-        age == "5-14" ~ "age_05_14",
-        age == "15-64" ~ "age_15_64",
-        age == "65+" ~ "age_65_99",
-        age == "total" ~ "age_total",
-        age == "unk" ~ "age_unk",
-      )) %>% 
-      mutate(countrycode=EU_short(countryname)) %>% 
-      select( 
-        country_short=countrycode,
-        date=date, # see if we need to be more explicit
-        target=indicator,
-        agegroup=age,
-        value=value
-      ) 
-    
-    #
-    data_sentinel_detections = data_sentinel_detections %>% 
-      mutate(date=ISOweek2date(paste0(yearweek,"-3"))) %>% 
-      mutate(age = case_when(
-        age == "0-4" ~ "age_00_04",
-        age == "5-14" ~ "age_05_14",
-        age == "15-64" ~ "age_15_64",
-        age == "65+" ~ "age_65_99",
-        age == "total" ~ "age_total",
-        age == "unk" ~ "age_unk",
-      )) %>% 
-      mutate(country_short=EU_short(countryname)) 
-    #
-    data_nonsentinel_detections = data_nonsentinel_detections %>% 
-      mutate(date=ISOweek2date(paste0(yearweek,"-3"))) %>% 
-      mutate(age = case_when(
-        age == "0-4" ~ "age_00_04",
-        age == "5-14" ~ "age_05_14",
-        age == "15-64" ~ "age_15_64",
-        age == "65+" ~ "age_65_99",
-        age == "total" ~ "age_total",
-        age == "unk" ~ "age_unk",
-      )) %>% 
-      mutate(country_short=EU_short(countryname)) 
-    
-    #
-    respicompass_iliplus = data_respicompass_iliplus %>% mutate(date=ISOweek2date(paste0(yearweek,"-3"))) %>% 
-      mutate(age = case_when(
-        age == "0-4" ~ "age_00_04",
-        age == "5-14" ~ "age_05_14",
-        age == "15-64" ~ "age_15_64",
-        age == "65+" ~ "age_65_99",
-        age == "total" ~ "age_total",
-        age == "unk" ~ "age_unk",
-      )) %>% 
-      mutate(countrycode=EU_short(location_name),target="ili_plus") %>% 
-      select( 
+    epi$respicompass_iliplus = data_respicompass_iliplus %>%
+      mutate(date=ISOweek2date(paste0(yearweek,"-3"))) %>%
+      mutate(age=recode_age(age)) %>%
+      mutate(countrycode=EU_short(location_name),target="ili_plus") %>%
+      select(
         country_short=countrycode,
         date=date, # see if we need to be more explicit
         target,
         agegroup=age,
         value=value
-      ) 
-    epi = list(
-      date_epilist_created = today(),
-      erviss_ili_ari = erviss_ili_ari,
-      erviss_typing_sentinel = data_sentinel_detections,
-      erviss_typing_nonsentinel = data_nonsentinel_detections,
-      respicompass_iliplus = respicompass_iliplus
-    )
+      )
+
     save(epi,file=here("output/epi.Rdata"))
-    
+
   } else { load(file=here("output/epi.Rdata")) }
-  
-  # adding to data 
+
+  # adding to data
   data$epi = epi
-  
+
   return(data)
 }
 
-load_flu_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
+load_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
   file_doesnot_exist = !file.exists(here("output/vax.Rdata"))
   if ( file_doesnot_exist|regenerate==T ) {
-    
+
     if (new_from_online==T) {
       # load data freshly from the internet
       data_vax = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv",show_col_types = FALSE)
       data_vax_hist = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/influenza/vaccination/vaccine_coverage_65plus.csv",show_col_types = FALSE)
       data_vax_hist_all = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/influenza/vaccination/vaccine_coverage_all.csv",show_col_types = F)
-      
+
       # write
       data_vax %>% write_csv(file=here("data/vax_flu_scenarios.csv"))
       data_vax_hist %>% write_csv(file=here("data/vax_flu_history.csv"))
       data_vax_hist_all %>% write_csv(file=here("data/vax_flu_history_all.csv"))
-      
+
     }
     if (new_from_online==F) {
       # load data from local storage
       data_vax = read_csv(file=here("data/vax_flu_scenarios.csv"),show_col_types = F )
       data_vax_hist = read_csv(file=here("data/vax_flu_history.csv"),show_col_types = F )
       data_vax_hist_all = read_csv(file=here("data/vax_flu_history_all.csv"),show_col_types = F )
-      
+
     }
-    
+
     vax = list(
       data_vax = data_vax %>% mutate(vaccine_coverage=vaccine_coverage/100) %>% pivot_wider(names_from = "scenario", values_from = vaccine_coverage),
       data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ) %>% mutate(season = str_replace(season, "-", "/")),
       data_vax_history_all = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ) %>% mutate(season = str_replace(season, "-", "/"))
     )
     save(vax,file=here("output/vax.Rdata"))
-    
+
   } else { load(file=here("output/vax.Rdata")) }
-  
-  # adding to data 
+
+  # adding to data
   data$vax = vax
-  
+
   return(data)
 }
 
-load_flu_data_contact = function(data=data, params=NULL , regenerate=T  , new_from_online=F){
+load_data_contact = function(data=data, params=NULL , regenerate=T  , new_from_online=F){
   file_doesnot_exist = !file.exists(here("output/contact.Rdata"))
   if ( file_doesnot_exist|regenerate==T ) {
-    
+
     if (new_from_online==T) {
       # load data freshly from the internet
       stop("Data available only locally")
-      
+
     }
     if (new_from_online==F) {
       # load data from local storage
@@ -171,27 +180,27 @@ load_flu_data_contact = function(data=data, params=NULL , regenerate=T  , new_fr
           contacts = read_excel(here("data/MUestimates_all_locations_2.xlsx"), sheet = country_i, col_names = F, .name_repair = "unique_quiet")
         }, silent = T)
         xdata[[country_i]] = contacts
-        
+
       }
     }
-    
+
     dat_contact = xdata
     save(dat_contact,file=here("output/contact.Rdata"))
-    
+
   } else { load(file=here("output/contact.Rdata")) }
-  
-  # adding to data 
+
+  # adding to data
   data$contact = dat_contact
-  
+
   return(data)
 }
 
-load_flu_data_helpers_respicompass = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
-  
+load_data_helpers_respicompass = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
+
   file_doesnot_exist = !file.exists(here("output/respicompass_helpers.Rdata"))
-  
+
   if ( file_doesnot_exist|regenerate==T ) {
-    
+
     if (new_from_online==T) {
       # load data freshly from the internet
       xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/supporting-files/locations_iso2_codes.csv",show_col_types = F)
@@ -205,25 +214,25 @@ load_flu_data_helpers_respicompass = function(data=data, params=NULL , regenerat
       xlocations = read_csv(file=here("output/respicompass_locations.csv"),show_col_types = F)
       xweeks = read_csv(file=here("output/respicompass_weeks.csv"),show_col_types = F)
     }
-    
+
     dat_helpers = list(
       iso2_code = xlocations,
       iso_weeks = xweeks
     )
     save(dat_helpers,file=here("output/respicompass_helpers.Rdata"))
-    
+
   } else { load(file=here("output/respicompass_helpers.Rdata")) }
-  
-  # adding to data 
+
+  # adding to data
   data$helpers_respicompass = dat_helpers
-  
+
   return(data)
 }
 
-load_flu_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
+load_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
   file_doesnot_exist = !file.exists(here("output/demography.Rdata"))
   if ( file_doesnot_exist|regenerate==T ) {
-    
+
     if (new_from_online==T) {
       # load data freshly from the internet
       # required libraries
@@ -239,8 +248,8 @@ load_flu_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  
       ## Querying simple data ----
       pop_data <- read_data(table = 'out.DM_Population_ByCountryEU',
                             connInfo = 'pop')
-      pop_data %>% as_tibble() %>% 
-        filter(ReportYear==2024,CountryCode%in%countries_short) %>% 
+      pop_data %>% as_tibble() %>%
+        filter(ReportYear==2024,CountryCode%in%countries_short) %>%
         filter(AgeGroup %in% c("Age00_04",
                                "Age05_09",
                                "Age10_14",
@@ -260,9 +269,9 @@ load_flu_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  
                                "Age80_84",
                                "Age85_89",
                                "Age90_94",
-                               "Age95+") ) %>% 
-        group_by(country=CountryCode,age_group=AgeGroup) %>% 
-        mutate(Population=as.numeric(Population)) %>% 
+                               "Age95+") ) %>%
+        group_by(country=CountryCode,age_group=AgeGroup) %>%
+        mutate(Population=as.numeric(Population)) %>%
         summarise(population=sum(Population)) %>% ungroup() -> mdat
       write_fst(mdat,path=here("data/population_pyramid.fst"))
     }
@@ -271,24 +280,24 @@ load_flu_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  
       pr=paste("Loading demography data from disk ... \n"); cat(green(pr))
       mdat = read_fst(path=here("data/population_pyramid.fst")) %>% as_tibble()
     }
-    
+
     dat_demography = list(
       population_pyramid = mdat
     )
     save(dat_demography,file=here("output/demography.Rdata"))
-    
+
   } else { load(file=here("output/demography.Rdata")) }
-  
-  # adding to data 
+
+  # adding to data
   data$demography_ECDC = dat_demography
-  
+
   return(data)
 }
 
-load_flu_data_demography_respicast = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
+load_data_demography_respicast = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
   file_doesnot_exist = !file.exists(here("output/demography_respicast.Rdata"))
   if ( file_doesnot_exist|regenerate==T ) {
-    
+
     if (new_from_online==T) {
       # load data freshly from the internet
       pop_df = NULL
@@ -308,10 +317,10 @@ load_flu_data_demography_respicast = function(data=data, params=NULL , regenerat
       }
       pop_df = pop_df %>% select(country,age_group,population)
       pop_df %>% write_csv(here("output/population_pyramid_respicast.csv"))
-      
+
       pop_fine_df = pop_fine_df %>% select(country,age_group,population)
       pop_fine_df %>% write_csv(here("output/population_pyramid_fine_respicast.csv"))
-      
+
     }
     if (new_from_online==F) {
       # load data from local storage
@@ -319,40 +328,39 @@ load_flu_data_demography_respicast = function(data=data, params=NULL , regenerat
       pop_df = read_csv(here("output/population_pyramid_respicast.csv"),show_col_types = F)
       pop_fine_df = read_csv(here("output/population_pyramid_fine_respicast.csv"),show_col_types = F)
     }
-    
+
     dat_demography = list(
       population_pyramid = pop_df,
       population_pyramid_fine = pop_fine_df
     )
     save(dat_demography,file=here("output/demography_respicast.Rdata"))
-    
+
   } else { load(file=here("output/demography_respicast.Rdata")) }
-  
-  # adding to data 
+
+  # adding to data
   data$demography_respicast = dat_demography
-  
+
   return(data)
 }
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Mother function: calling the data-loading functions for each data stream ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-load_flu_data = function( params=NULL , regenerate=F,new_from_online=T  ){
-  
+load_data = function( params=NULL , regenerate=F,new_from_online=T  ){
+
   data = list() # reset data list
-  
-  data = load_flu_data_epi( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate )
-  
-  data = load_flu_data_vax( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
-  
-  data = load_flu_data_contact( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
-  
-  data = load_flu_data_helpers_respicompass( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
-  
-  data = load_flu_data_demography_ECDC( data=data, params=NULL , new_from_online=F , regenerate=F)
-  
-  data = load_flu_data_demography_respicast( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
-  
+
+  data = load_data_epi( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate )
+
+  data = load_data_vax( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
+
+  data = load_data_contact( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+
+  data = load_data_helpers_respicompass( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
+
+  data = load_data_demography_ECDC( data=data, params=NULL , new_from_online=F , regenerate=F)
+
+  data = load_data_demography_respicast( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
+
   return(data)
 }
-
