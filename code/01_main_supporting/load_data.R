@@ -143,10 +143,12 @@ load_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_onlin
 
     }
 
+    # ":" is the Eurostat/ECDC "not available" placeholder -> map to NA before the numeric cast,
+    # so the coercion is deliberate (no "NAs introduced by coercion" warning)
     vax = list(
       data_vax = data_vax %>% mutate(vaccine_coverage=vaccine_coverage/100) %>% pivot_wider(names_from = "scenario", values_from = vaccine_coverage),
-      data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ) %>% mutate(season = str_replace(season, "-", "/")),
-      data_vax_history_all = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(vaccine_coverage)/100 ) %>% mutate(season = str_replace(season, "-", "/"))
+      data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(na_if(vaccine_coverage,":"))/100 ) %>% mutate(season = str_replace(season, "-", "/")),
+      data_vax_history_all = data_vax_hist_all %>% mutate(vaccine_coverage=as.numeric(na_if(vaccine_coverage,":"))/100 ) %>% mutate(season = str_replace(season, "-", "/"))
     )
     save(vax,file=here("output/vax.Rdata"))
 
