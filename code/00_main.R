@@ -11,6 +11,7 @@ source("code/02_settings/settings_version0.R"); params=settings() # settings_ver
 source("code/01_main_supporting/flu_functions.R")
 source("code/01_main_supporting/load_data.R")
 source("code/01_main_supporting/gen_model_input.R")
+source("code/01_main_supporting/eyeballing.R")
 source("code/01_main_supporting/run_model.R")
 source("code/01_main_supporting/process_and_save.R")
 source("code/01_main_supporting/send_report.R")
