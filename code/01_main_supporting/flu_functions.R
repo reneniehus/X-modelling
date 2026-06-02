@@ -101,88 +101,10 @@ add_season_time_columns <- function(df, params=NULL) {
 }
 
 # NOTE: the canonical-table builders (make_data_timeseries_long / make_data_timeseries_wide /
-# make_data_season_summary / the indicator label+unit helpers) and eyeballing() now live in
-# code/01_main_supporting/gen_model_input.R. add_season_time_columns() and
+# make_data_season_summary / the indicator label+unit helpers) now live in
+# code/01_main_supporting/gen_model_input.R, and the visual eyeballing() in
+# code/01_main_supporting/eyeballing.R. add_season_time_columns() and
 # season_start_year_from_label() above are kept here because they are shared helpers.
-
-# ---- |-eyeballing(): quick visual sanity check of the canonical long table ----
-# works off the new models_in schema (country_short, season, date, source, stream, pathogen,
-# indicator, indicator_label, agegroup, value, ...). Shows: indicator dynamics, the ILI+
-# family across pathogens, testing/positivity, per-season completeness, and age structure.
-eyeballing <- function(models_in, params=NULL, data=NULL, countries=NULL, seasons=NULL, interactive=TRUE) {
-  data_timeseries_long <- models_in$data_timeseries_long
-  data_season_summary  <- models_in$data_season_summary
-  if (is.null(countries)) countries <- params$run_countries
-  if (is.null(countries) || length(countries)==0) countries <- data_timeseries_long$country_short %>% unique() %>% head(6)
-  if (is.null(seasons)) seasons <- data_timeseries_long$season %>% unique()
-  plot_data <- data_timeseries_long %>% filter(country_short %in% countries, season %in% seasons)
-
-  # main syndromic + positivity dynamics (age-pooled view)
-  p_indicators <- plot_data %>%
-    filter(temporal_resolution=="weekly", agegroup=="age_total",
-           indicator %in% c("ILIconsultationrate", "ARIconsultationrate", "positivity")) %>%
-    ggplot(aes(date, value, color=indicator_label, linetype=stream)) +
-    geom_line(na.rm=TRUE) +
-    facet_grid(country_short ~ season, scales="free") +
-    labs(title="Respiratory indicator dynamics by country and season", x=NULL, y="Value", color="Indicator", linetype="Stream") +
-    theme_minimal()
-
-  # the ILI+ family: one line per pathogen (Influenza / SARS-CoV-2 / RSV) and source/stream
-  p_iliplus <- plot_data %>%
-    filter(temporal_resolution=="weekly", agegroup=="age_total", indicator=="ili_plus") %>%
-    ggplot(aes(date, value, color=pathogen, linetype=stream)) +
-    geom_line(na.rm=TRUE) +
-    facet_grid(country_short ~ season, scales="free") +
-    labs(title="ILI+ by pathogen (ILI rate x positivity)", x=NULL, y="ILI+", color="Pathogen", linetype="Stream") +
-    theme_minimal()
-
-  # data completeness per season (observed weeks / weeks in season)
-  p_quality <- data_season_summary %>%
-    filter(country_short %in% countries, season %in% seasons, summary_level=="all_agegroups",
-           temporal_resolution=="weekly") %>%
-    ggplot(aes(season, completeness, fill=indicator_label)) +
-    geom_col(position="dodge") +
-    facet_grid(country_short ~ stream) +
-    coord_cartesian(ylim=c(0, 1)) +
-    labs(title="Weekly completeness by season", x=NULL, y="Completeness", fill="Indicator") +
-    theme_minimal() +
-    theme(axis.text.x=element_text(angle=45, hjust=1))
-
-  # testing effort, detections and positivity per pathogen and stream
-  p_testing <- plot_data %>%
-    filter(temporal_resolution=="weekly", agegroup=="age_total",
-           indicator %in% c("tests", "detections", "positivity"),
-           stream %in% c("typing_sentinel", "typing_nonsentinel")) %>%
-    ggplot(aes(date, value, color=pathogen, linetype=stream)) +
-    geom_line(na.rm=TRUE) +
-    facet_grid(indicator + country_short ~ season, scales="free") +
-    labs(title="Testing, detections and positivity by pathogen", x=NULL, y="Value", color="Pathogen", linetype="Stream") +
-    theme_minimal()
-
-  # age structure of the syndromic + ILI+ indicators
-  p_age <- plot_data %>%
-    filter(temporal_resolution=="weekly",
-           indicator %in% c("ILIconsultationrate", "ARIconsultationrate", "ili_plus"),
-           agegroup != "age_total") %>%
-    ggplot(aes(date, value, color=agegroup)) +
-    geom_line(na.rm=TRUE) +
-    facet_grid(indicator_label + country_short ~ season, scales="free") +
-    labs(title="Age-specific syndromic and ILI+ indicators", x=NULL, y="Value", color="Age group") +
-    theme_minimal()
-
-  plots <- list(indicator_dynamics=p_indicators, ili_plus_by_pathogen=p_iliplus,
-                data_quality=p_quality, testing_dynamics=p_testing, age_dynamics=p_age)
-  interactive_plots <- NULL
-  if (interactive && requireNamespace("plotly", quietly=TRUE)) {
-    interactive_plots <- purrr::map(plots, plotly::ggplotly)
-  }
-  list(
-    plots=plots,
-    interactive_plots=interactive_plots,
-    data_used=plot_data,
-    note=if (is.null(interactive_plots)) "Install/load plotly to receive interactive ggplotly versions of the plots." else "Interactive plotly versions are available in interactive_plots."
-  )
-}
 
 
 data_into_all_season = function(data,params,withforce=F){
