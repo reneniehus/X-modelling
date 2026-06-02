@@ -1,10 +1,46 @@
-# 1: small helpers shared by the data-loading functions
+# 1: small helpers shared by the data-loading functions (incl. the cache helper)
 # 2: defining functions that load each data stream
 # 3: define a mother function that calls each data stream function
+#
+# Conventions used by every loader below:
+#   data             - the growing list of data streams; each loader adds one named slot and returns it
+#   params           - run settings (see settings_version0.R); threaded through so any loader MIGHT use it
+#   regenerate       - F: reuse the cached output/<name>.Rdata if present; T: rebuild it from scratch
+#   new_from_online  - T: (re)fetch from the internet and refresh the local snapshot;
+#                      F: read the local snapshot, self-bootstrapping (fetch on the fly) if it is missing
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Helpers shared across the data-loading functions ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+# ---- |-cache helper: load a stream from cache, or (re)build and cache it ----
+# Every data stream shares the same caching dance, so it lives here once instead of being
+# copy-pasted into each loader. Pass a build_fn() that constructs the object from scratch:
+#   - if output/<name>.Rdata exists and regenerate==F  -> return the cached object
+#   - otherwise                                         -> run build_fn(), cache it, return it
+# The cache is read into a throw-away environment so we recover the object whatever variable
+# name it was saved under (keeps us compatible with older caches).
+load_or_build = function(name, build_fn, regenerate=FALSE){
+  cache_path = here("output", paste0(name, ".Rdata"))
+  if (file.exists(cache_path) & !regenerate) {
+    pr=paste0("Loading '",name,"' from cache (output/",name,".Rdata) ... \n"); cat(green(pr))
+    cache_env = new.env()
+    load(cache_path, envir=cache_env)
+    return(get(ls(cache_env)[1], envir=cache_env))
+  }
+  obj = build_fn()                  # stream-specific construction
+  save(obj, file=cache_path)        # refresh the on-disk cache
+  return(obj)
+}
+
+# ---- |-build a RespiCompass raw-file URL for the active hub round ----
+# the round folder changes each season, so keep it in one place (params$respicompass_round)
+# rather than repeating the full path at every read_csv() call.
+respicompass_file = function(relpath, params=NULL){
+  round = if (!is.null(params$respicompass_round)) params$respicompass_round else "2024-2025_round_1"
+  paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/",
+         "refs/heads/main/Previous_Rounds/", round, "/", relpath)
+}
 
 # ---- |-recode the ERVISS age labels to our age-group labels ----
 recode_age = function(age){
@@ -40,10 +76,9 @@ standardise_erviss = function(df, schema){
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Defining data-loading functions for each data stream ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-load_data_epi = function(data=data, params=NULL, regenerate=T , new_from_online=T){
+load_data_epi = function(data=list(), params=NULL, regenerate=FALSE, new_from_online=TRUE){
 
-  file_doesnot_exist = !file.exists("output/epi.Rdata")
-  if ( file_doesnot_exist|regenerate==T ) {
+  build_epi = function(){
 
     # ---- |-ERVISS file registry ----
     # one row per dataset published in the ECDC ERVISS data folder:
@@ -91,7 +126,7 @@ load_data_epi = function(data=data, params=NULL, regenerate=T , new_from_online=
     iliplus_snapshot = here("data/data_respicompass_iliplus.csv")
     if (new_from_online==T | !file.exists(iliplus_snapshot)) {
       pr=paste("Loading RespiCompass ili_plus from github ... \n"); cat(green(pr))
-      data_respicompass_iliplus = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/target-data/influenza/ili_plus.csv",show_col_types = FALSE)
+      data_respicompass_iliplus = read_csv(file=respicompass_file("target-data/influenza/ili_plus.csv", params), show_col_types = FALSE)
       data_respicompass_iliplus %>% write_csv(file=iliplus_snapshot)
     } else {
       pr=paste("Loading RespiCompass ili_plus from disk ... \n"); cat(green(pr))
@@ -103,155 +138,131 @@ load_data_epi = function(data=data, params=NULL, regenerate=T , new_from_online=
       mutate(countrycode=EU_short(location_name),target="ili_plus") %>%
       select(
         country_short=countrycode,
-        date=date, # see if we need to be more explicit
+        date,
         target,
         agegroup=age,
         value=value
       )
 
-    save(epi,file=here("output/epi.Rdata"))
+    return(epi)
+  }
 
-  } else { load(file=here("output/epi.Rdata")) }
-
-  # adding to data
-  data$epi = epi
-
+  data$epi = load_or_build("epi", build_epi, regenerate=regenerate)
   return(data)
 }
 
-load_data_vax = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
-  file_doesnot_exist = !file.exists(here("output/vax.Rdata"))
-  if ( file_doesnot_exist|regenerate==T ) {
+load_data_vax = function(data=list(), params=NULL, regenerate=FALSE, new_from_online=TRUE){
 
-    if (new_from_online==T) {
-      # load data freshly from the internet
-      data_vax = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv",show_col_types = FALSE)
-      data_vax_hist = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/influenza/vaccination/vaccine_coverage_65plus.csv",show_col_types = FALSE)
-      data_vax_hist_all = read_csv("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/influenza/vaccination/vaccine_coverage_all.csv",show_col_types = F)
-
-      # write
-      data_vax %>% write_csv(file=here("data/vax_flu_scenarios.csv"))
-      data_vax_hist %>% write_csv(file=here("data/vax_flu_history.csv"))
+  build_vax = function(){
+    # fetch online when asked to, or when the local snapshots are missing (self-bootstrapping)
+    fetch_online = new_from_online==T | !file.exists(here("data/vax_flu_scenarios.csv"))
+    if (fetch_online) {
+      pr=paste("Loading vaccination data from github ... \n"); cat(green(pr))
+      data_vax          = read_csv(respicompass_file("auxiliary-data/influenza/vaccination/influenza_vax_scenarios.csv", params), show_col_types = FALSE)
+      data_vax_hist     = read_csv(respicompass_file("auxiliary-data/influenza/vaccination/vaccine_coverage_65plus.csv", params), show_col_types = FALSE)
+      data_vax_hist_all = read_csv(respicompass_file("auxiliary-data/influenza/vaccination/vaccine_coverage_all.csv",    params), show_col_types = FALSE)
+      # keep / refresh the local snapshots
+      data_vax          %>% write_csv(file=here("data/vax_flu_scenarios.csv"))
+      data_vax_hist     %>% write_csv(file=here("data/vax_flu_history.csv"))
       data_vax_hist_all %>% write_csv(file=here("data/vax_flu_history_all.csv"))
-
-    }
-    if (new_from_online==F) {
-      # load data from local storage
-      data_vax = read_csv(file=here("data/vax_flu_scenarios.csv"),show_col_types = F )
-      data_vax_hist = read_csv(file=here("data/vax_flu_history.csv"),show_col_types = F )
-      data_vax_hist_all = read_csv(file=here("data/vax_flu_history_all.csv"),show_col_types = F )
-
+    } else {
+      pr=paste("Loading vaccination data from disk ... \n"); cat(green(pr))
+      data_vax          = read_csv(file=here("data/vax_flu_scenarios.csv"),   show_col_types = FALSE)
+      data_vax_hist     = read_csv(file=here("data/vax_flu_history.csv"),     show_col_types = FALSE)
+      data_vax_hist_all = read_csv(file=here("data/vax_flu_history_all.csv"), show_col_types = FALSE)
     }
 
     # ":" is the Eurostat/ECDC "not available" placeholder -> map to NA before the numeric cast,
-    # so the coercion is deliberate (no "NAs introduced by coercion" warning)
-    vax = list(
-      data_vax = data_vax %>% mutate(vaccine_coverage=vaccine_coverage/100) %>% pivot_wider(names_from = "scenario", values_from = vaccine_coverage),
-      data_vax_history = data_vax_hist %>% mutate(vaccine_coverage=as.numeric(na_if(vaccine_coverage,":"))/100 ) %>% mutate(season = str_replace(season, "-", "/")),
-      data_vax_history_all = data_vax_hist_all %>% mutate(vaccine_coverage=as.numeric(na_if(vaccine_coverage,":"))/100 ) %>% mutate(season = str_replace(season, "-", "/"))
+    # so the coercion is deliberate (no "NAs introduced by coercion" warning).
+    # data_vax_history     = 65+ coverage only; data_vax_history_all = every reported target group.
+    list(
+      data_vax             = data_vax %>% mutate(vaccine_coverage=vaccine_coverage/100) %>% pivot_wider(names_from = "scenario", values_from = vaccine_coverage),
+      data_vax_history     = data_vax_hist     %>% mutate(vaccine_coverage=as.numeric(na_if(vaccine_coverage,":"))/100) %>% mutate(season = str_replace(season, "-", "/")),
+      data_vax_history_all = data_vax_hist_all %>% mutate(vaccine_coverage=as.numeric(na_if(vaccine_coverage,":"))/100) %>% mutate(season = str_replace(season, "-", "/"))
     )
-    save(vax,file=here("output/vax.Rdata"))
+  }
 
-  } else { load(file=here("output/vax.Rdata")) }
-
-  # adding to data
-  data$vax = vax
-
+  data$vax = load_or_build("vax", build_vax, regenerate=regenerate)
   return(data)
 }
 
-load_data_contact = function(data=data, params=NULL , regenerate=T  , new_from_online=F){
-  file_doesnot_exist = !file.exists(here("output/contact.Rdata"))
-  if ( file_doesnot_exist|regenerate==T ) {
+# contact data is LOCAL-ONLY: the Prem et al. synthetic contact matrices ship with the repo
+# (data/MUestimates_all_locations_{1,2}.xlsx), so there is no online mode here.
+load_data_contact = function(data=list(), params=NULL, regenerate=FALSE){
 
-    if (new_from_online==T) {
-      # load data freshly from the internet
-      stop("Data available only locally")
-
+  build_contact = function(){
+    # the country list comes from the already-loaded RespiCompass helpers (run that loader first)
+    if (is.null(data$helpers_respicompass)) {
+      stop("load_data_contact() needs data$helpers_respicompass -- run load_data_helpers_respicompass() first.")
     }
-    if (new_from_online==F) {
-      # load data from local storage
-      xdata = list()
-      xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/supporting-files/locations_iso2_codes.csv",show_col_types = F)
-      for (country_i in xlocations$location_name){ # country_i = xlocations$location_name[1]
-        contacts = 0
-        try({ # As there are two files, each with half the countries, try to get contact matrix for a given country from both files
-          contacts = read_excel(here("data/MUestimates_all_locations_1.xlsx"), sheet = country_i, col_names = F, .name_repair = "unique_quiet", skip = 1)
-        }, silent = T)
-        try({
-          contacts = read_excel(here("data/MUestimates_all_locations_2.xlsx"), sheet = country_i, col_names = F, .name_repair = "unique_quiet")
-        }, silent = T)
-        xdata[[country_i]] = contacts
+    xlocations = data$helpers_respicompass$iso2_code
 
-      }
+    xdata = list()
+    for (country_i in xlocations$location_name){ # country_i = xlocations$location_name[1]
+      contacts = 0
+      # the matrices are split across two workbooks (each holds ~half the countries); a country is a
+      # sheet in exactly one of them, so we try both and keep whichever read succeeds
+      try({
+        contacts = read_excel(here("data/MUestimates_all_locations_1.xlsx"), sheet = country_i, col_names = F, .name_repair = "unique_quiet", skip = 1)
+      }, silent = T)
+      try({
+        contacts = read_excel(here("data/MUestimates_all_locations_2.xlsx"), sheet = country_i, col_names = F, .name_repair = "unique_quiet")
+      }, silent = T)
+      xdata[[country_i]] = contacts
     }
+    return(xdata)
+  }
 
-    dat_contact = xdata
-    save(dat_contact,file=here("output/contact.Rdata"))
-
-  } else { load(file=here("output/contact.Rdata")) }
-
-  # adding to data
-  data$contact = dat_contact
-
+  data$contact = load_or_build("contact", build_contact, regenerate=regenerate)
   return(data)
 }
 
-load_data_helpers_respicompass = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
+load_data_helpers_respicompass = function(data=list(), params=NULL, regenerate=FALSE, new_from_online=TRUE){
 
-  file_doesnot_exist = !file.exists(here("output/respicompass_helpers.Rdata"))
-
-  if ( file_doesnot_exist|regenerate==T ) {
-
-    if (new_from_online==T) {
-      # load data freshly from the internet
-      xlocations = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/supporting-files/locations_iso2_codes.csv",show_col_types = F)
-      xweeks = read_csv(file="https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/supporting-files/iso_weeks.csv",show_col_types = F)
-      # write to disk
+  build_helpers = function(){
+    # fetch online when asked to, or when either snapshot is missing (self-bootstrapping)
+    fetch_online = new_from_online==T |
+      !file.exists(here("output/respicompass_locations.csv")) |
+      !file.exists(here("output/respicompass_weeks.csv"))
+    if (fetch_online) {
+      pr=paste("Loading RespiCompass helpers from github ... \n"); cat(green(pr))
+      xlocations = read_csv(respicompass_file("supporting-files/locations_iso2_codes.csv", params), show_col_types = F)
+      xweeks     = read_csv(respicompass_file("supporting-files/iso_weeks.csv",            params), show_col_types = F)
+      # keep / refresh the local snapshots
       xlocations %>% write_csv(file=here("output/respicompass_locations.csv"))
-      xweeks %>% write_csv(file=here("output/respicompass_weeks.csv"))
-    }
-    if (new_from_online==F) {
-      # load data from local storage
-      xlocations = read_csv(file=here("output/respicompass_locations.csv"),show_col_types = F)
-      xweeks = read_csv(file=here("output/respicompass_weeks.csv"),show_col_types = F)
+      xweeks     %>% write_csv(file=here("output/respicompass_weeks.csv"))
+    } else {
+      pr=paste("Loading RespiCompass helpers from disk ... \n"); cat(green(pr))
+      xlocations = read_csv(here("output/respicompass_locations.csv"), show_col_types = F)
+      xweeks     = read_csv(here("output/respicompass_weeks.csv"),     show_col_types = F)
     }
 
-    dat_helpers = list(
+    list(
       iso2_code = xlocations,
       iso_weeks = xweeks
     )
-    save(dat_helpers,file=here("output/respicompass_helpers.Rdata"))
+  }
 
-  } else { load(file=here("output/respicompass_helpers.Rdata")) }
-
-  # adding to data
-  data$helpers_respicompass = dat_helpers
-
+  data$helpers_respicompass = load_or_build("respicompass_helpers", build_helpers, regenerate=regenerate)
   return(data)
 }
 
-load_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
-  file_doesnot_exist = !file.exists(here("output/demography.Rdata"))
-  if ( file_doesnot_exist|regenerate==T ) {
+load_data_demography_ECDC = function(data=list(), params=NULL, regenerate=FALSE, new_from_online=FALSE){
 
+  build_demography_ECDC = function(){
     if (new_from_online==T) {
-      # load data freshly from the internet
-      # required libraries
-      pr=paste("Loading demography data from database ... \n"); cat(green(pr))
+      # ---- query the ECDC internal SQL database (reachable only inside the ECDC network) ----
+      # dormant by default; activated via params$use_ecdc_db (see load_data()).
+      pr=paste("Loading demography data from ECDC database ... \n"); cat(green(pr))
       source(here('db/logger.R'))
       source(here('db/sql_utils.R'))
-      # Logger is needed for running SQL utils
-      logger <- forge_logger()(logLevel = 'INFO')
-      # This is where the SQL Profiles are stored (always needed)
-      dbDir <- 'db/'
-      # This is where the SQL templates are stored (needed only if you're using them)
-      SQLTemplatePath <- 'db/templates/sql/'
-      ## Querying simple data ----
-      pop_data <- read_data(table = 'out.DM_Population_ByCountryEU',
-                            connInfo = 'pop')
+      logger <- forge_logger()(logLevel = 'INFO')   # logger is needed for running the SQL utils
+      dbDir <- 'db/'                                 # where the SQL connection profiles live (always needed)
+      SQLTemplatePath <- 'db/templates/sql/'         # where the SQL templates live (only if using them)
+      report_year = if (!is.null(params$demography_year)) params$demography_year else 2024
+      pop_data <- read_data(table = 'out.DM_Population_ByCountryEU', connInfo = 'pop')
       pop_data %>% as_tibble() %>%
-        filter(ReportYear==2024,CountryCode%in%countries_short) %>%
+        filter(ReportYear==report_year, CountryCode%in%countries_short) %>%
         filter(AgeGroup %in% c("Age00_04",
                                "Age05_09",
                                "Age10_14",
@@ -275,94 +286,84 @@ load_data_demography_ECDC = function(data=data, params=NULL , regenerate=T  , ne
         group_by(country=CountryCode,age_group=AgeGroup) %>%
         mutate(Population=as.numeric(Population)) %>%
         summarise(population=sum(Population)) %>% ungroup() -> mdat
-      write_fst(mdat,path=here("data/population_pyramid.fst"))
-    }
-    if (new_from_online==F) {
-      # load data from local storage
+      write_fst(mdat,path=here("data/population_pyramid.fst"))   # refresh the committed snapshot
+    } else {
+      # ---- read the committed snapshot (works without the ECDC network) ----
       pr=paste("Loading demography data from disk ... \n"); cat(green(pr))
       mdat = read_fst(path=here("data/population_pyramid.fst")) %>% as_tibble()
     }
 
-    dat_demography = list(
+    list(
       population_pyramid = mdat
     )
-    save(dat_demography,file=here("output/demography.Rdata"))
+  }
 
-  } else { load(file=here("output/demography.Rdata")) }
-
-  # adding to data
-  data$demography_ECDC = dat_demography
-
+  data$demography_ECDC = load_or_build("demography", build_demography_ECDC, regenerate=regenerate)
   return(data)
 }
 
-load_data_demography_respicast = function(data=data, params=NULL , regenerate=T  , new_from_online=T){
-  file_doesnot_exist = !file.exists(here("output/demography_respicast.Rdata"))
-  if ( file_doesnot_exist|regenerate==T ) {
+load_data_demography_respicast = function(data=list(), params=NULL, regenerate=FALSE, new_from_online=TRUE){
 
-    if (new_from_online==T) {
-      # load data freshly from the internet
-      pop_df = NULL
-      pop_fine_df = NULL
-      xlocations = read_csv(file=here("output/respicompass_locations.csv"),show_col_types = F)
-      country_v = xlocations$location_name
-      for (country_i in country_v) {
-        pr=paste("> Loading pop data for:",country_i,"... \n"); cat(green(pr))
-        read_file=paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/miscellaneous/population/",country_i,"_aggr.csv")
-        read_file_fine = paste0("https://raw.githubusercontent.com/european-modelling-hubs/RespiCompass/refs/heads/main/Previous_Rounds/2024-2025_round_1/auxiliary-data/miscellaneous/population/",country_i,".csv")
-        xdf = read_csv(read_file,show_col_types = FALSE)
-        xdf_fine = read_csv(read_file_fine,show_col_types = FALSE)
-        xdf$country = country_i
-        xdf_fine$country = country_i
-        pop_df=rbind(pop_df,xdf)
-        pop_fine_df=rbind(pop_fine_df,xdf_fine)
+  build_demography_respicast = function(){
+    # fetch online when asked to, or when the snapshot is missing (self-bootstrapping)
+    fetch_online = new_from_online==T | !file.exists(here("output/population_pyramid_respicast.csv"))
+    if (fetch_online) {
+      # RespiCompass ships one population file per country (aggregated + fine age bands); loop and stack.
+      if (is.null(data$helpers_respicompass)) {
+        stop("load_data_demography_respicast() needs data$helpers_respicompass -- run load_data_helpers_respicompass() first.")
       }
-      pop_df = pop_df %>% select(country,age_group,population)
-      pop_df %>% write_csv(here("output/population_pyramid_respicast.csv"))
-
-      pop_fine_df = pop_fine_df %>% select(country,age_group,population)
+      country_v = data$helpers_respicompass$iso2_code$location_name
+      # read one country's population file (aggregated age bands, or fine single-year bands)
+      load_one_country = function(country_i, fine=FALSE){
+        pr=paste("> Loading respicast pop for:",country_i, if (fine) "(fine)" else "(aggregated)", "... \n"); cat(green(pr))
+        relpath = paste0("auxiliary-data/miscellaneous/population/", country_i, if (fine) ".csv" else "_aggr.csv")
+        read_csv(respicompass_file(relpath, params), show_col_types = FALSE) %>% mutate(country = country_i)
+      }
+      pop_df      = map_dfr(country_v, load_one_country, fine=FALSE) %>% select(country, age_group, population)
+      pop_fine_df = map_dfr(country_v, load_one_country, fine=TRUE)  %>% select(country, age_group, population)
+      # keep / refresh the local snapshots
+      pop_df      %>% write_csv(here("output/population_pyramid_respicast.csv"))
       pop_fine_df %>% write_csv(here("output/population_pyramid_fine_respicast.csv"))
-
-    }
-    if (new_from_online==F) {
-      # load data from local storage
+    } else {
       pr=paste("Loading respicast demography data from disk ... \n"); cat(green(pr))
-      pop_df = read_csv(here("output/population_pyramid_respicast.csv"),show_col_types = F)
-      pop_fine_df = read_csv(here("output/population_pyramid_fine_respicast.csv"),show_col_types = F)
+      pop_df      = read_csv(here("output/population_pyramid_respicast.csv"),      show_col_types = F)
+      pop_fine_df = read_csv(here("output/population_pyramid_fine_respicast.csv"), show_col_types = F)
     }
 
-    dat_demography = list(
-      population_pyramid = pop_df,
+    list(
+      population_pyramid      = pop_df,
       population_pyramid_fine = pop_fine_df
     )
-    save(dat_demography,file=here("output/demography_respicast.Rdata"))
+  }
 
-  } else { load(file=here("output/demography_respicast.Rdata")) }
-
-  # adding to data
-  data$demography_respicast = dat_demography
-
+  data$demography_respicast = load_or_build("demography_respicast", build_demography_respicast, regenerate=regenerate)
   return(data)
 }
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### Mother function: calling the data-loading functions for each data stream ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-load_data = function( params=NULL , regenerate=F,new_from_online=T  ){
+# Order matters: helpers_respicompass produces the country list that the contact and
+# respicast-demography streams depend on, so it runs before them.
+load_data = function( params=NULL , regenerate=FALSE , new_from_online=TRUE ){
 
   data = list() # reset data list
 
-  data = load_data_epi( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate )
+  data = load_data_epi( data=data, params=params, regenerate=regenerate, new_from_online=new_from_online )
 
-  data = load_data_vax( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
+  data = load_data_vax( data=data, params=params, regenerate=regenerate, new_from_online=new_from_online )
 
-  data = load_data_contact( data=data, params=NULL , new_from_online=F , regenerate=regenerate)
+  data = load_data_helpers_respicompass( data=data, params=params, regenerate=regenerate, new_from_online=new_from_online )
 
-  data = load_data_helpers_respicompass( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
+  # contact is local-only (Prem matrices shipped in the repo) -> no online fetch
+  data = load_data_contact( data=data, params=params, regenerate=regenerate )
 
-  data = load_data_demography_ECDC( data=data, params=NULL , new_from_online=F , regenerate=F)
+  # ECDC demography lives in the ECDC internal SQL DB (only inside the ECDC network) -> dormant
+  # by default; set params$use_ecdc_db=TRUE to query it live, otherwise the committed snapshot is used.
+  use_ecdc_db = isTRUE(params$use_ecdc_db)
+  data = load_data_demography_ECDC( data=data, params=params, regenerate=regenerate, new_from_online=use_ecdc_db )
 
-  data = load_data_demography_respicast( data=data, params=NULL , new_from_online=new_from_online , regenerate=regenerate)
+  data = load_data_demography_respicast( data=data, params=params, regenerate=regenerate, new_from_online=new_from_online )
 
   return(data)
 }
