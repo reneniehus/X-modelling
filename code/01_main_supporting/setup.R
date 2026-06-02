@@ -216,7 +216,7 @@ countries <- c("Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czechia",
                "Poland", "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", 
                "Sweden",
                # non EU/EEA
-               "Switzerland","England","Norther Ireland","Scotland","EU/EEA")
+               "Switzerland","England","Northern Ireland","Scotland","EU/EEA")
 countries_short <- c("AT", "BE", "BG", "HR", "CY", "CZ", 
                      "DK", "EE", "FI", "FR", "DE", "GR", 
                      "HU", "IS", "IE", "IT", "LV", "LI", 
