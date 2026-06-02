@@ -243,13 +243,26 @@ make_data_season_summary = function(data_timeseries_long, params=NULL){
     summarise_timeseries_group() %>%
     mutate(agegroup="all_agegroups", summary_level="all_agegroups")
 
+  # Two complementary completeness measures (a week is "observed" if its value is non-missing;
+  # a reported 0 counts as observed, and positivity needs both detections and tests present):
+  #   completeness        = observed weeks / ISO weeks in the FULL Aug-Jul season window.
+  #                         Penalises the off-season, so winter-only streams cap well below 1.
+  #   completeness_active = observed weeks / weeks between the first and last observed week.
+  #                         Ignores the off-season; measures gaps WITHIN the active reporting span.
   bind_rows(per_age, pooled_age) %>%
     left_join(weeks_in_season, by="season") %>%
-    mutate(completeness = ifelse(temporal_resolution == "weekly",
-                                 n_weeks_observed / weeks_in_season, NA_real_)) %>%
+    mutate(
+      weeks_in_span       = ifelse(temporal_resolution == "weekly" & !is.na(first_date) & !is.na(last_date),
+                                   as.integer(last_date - first_date) %/% 7L + 1L, NA_integer_),
+      completeness        = ifelse(temporal_resolution == "weekly",
+                                   n_weeks_observed / weeks_in_season, NA_real_),
+      completeness_active = ifelse(!is.na(weeks_in_span) & weeks_in_span > 0,
+                                   pmin(1, n_weeks_observed / weeks_in_span), NA_real_)
+    ) %>%
     select(country_short, season, source, stream, pathogen, indicator, indicator_label,
            scenario, agegroup, summary_level, unit, temporal_resolution,
-           weeks_in_season, n_weeks_observed, completeness, everything()) %>%
+           weeks_in_season, weeks_in_span, n_weeks_observed,
+           completeness, completeness_active, everything()) %>%
     arrange(country_short, season, source, stream, pathogen, indicator, summary_level, agegroup)
 }
 

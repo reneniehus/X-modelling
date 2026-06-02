@@ -33,8 +33,9 @@ theme_eyeball = function(base_size=14){
 ### Individual figure builders ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-# ---- |-Quality 1: completeness heatmap (country x season x indicator) ----
-fig_completeness = function(season_summary){
+# ---- |-Quality: completeness heatmaps (country x season x indicator) ----
+# shared selection of series + one tile plot, reused for both completeness measures
+completeness_panel_df = function(season_summary){
   # curated set of series to show, with a readable panel label and a fixed ordering
   quality_series = tribble(
     ~stream,             ~indicator,            ~pathogen,     ~panel,
@@ -47,21 +48,34 @@ fig_completeness = function(season_summary){
   )
   key_of = function(stream, indicator, pathogen) paste(stream, indicator, ifelse(is.na(pathogen), "", pathogen), sep="|")
   selected = quality_series %>% mutate(.k=key_of(stream, indicator, pathogen))
-
-  df = season_summary %>%
+  season_summary %>%
     filter(summary_level=="all_agegroups", temporal_resolution=="weekly") %>%
     mutate(.k=key_of(stream, indicator, pathogen)) %>%
     inner_join(selected %>% select(.k, panel), by=".k") %>%
     mutate(panel=factor(panel, levels=quality_series$panel))
+}
 
-  ggplot2::ggplot(df, ggplot2::aes(season, country_short, fill=completeness)) +
+plot_completeness = function(df, fill_var, title, fill_lab){
+  ggplot2::ggplot(df, ggplot2::aes(season, country_short, fill=.data[[fill_var]])) +
     ggplot2::geom_tile(colour="white", linewidth=0.2) +
     ggplot2::facet_wrap(~panel, ncol=3) +
     ggplot2::scale_fill_viridis_c(limits=c(0,1), labels=scales::percent, na.value="grey92") +
-    ggplot2::labs(title="Surveillance completeness across countries and seasons",
-                  x=NULL, y=NULL, fill="Weeks reported / weeks in season") +
+    ggplot2::labs(title=title, x=NULL, y=NULL, fill=fill_lab) +
     theme_eyeball() +
     ggplot2::theme(axis.text.x=ggplot2::element_text(angle=45, hjust=1))
+}
+
+fig_completeness = function(season_summary){
+  plot_completeness(completeness_panel_df(season_summary), "completeness",
+                    "Season-window completeness across countries and seasons",
+                    "Reported weeks / weeks in season")
+}
+
+# alternative measure: completeness within the active reporting span (off-season ignored)
+fig_completeness_active = function(season_summary){
+  plot_completeness(completeness_panel_df(season_summary), "completeness_active",
+                    "Active-span completeness across countries and seasons",
+                    "Reported weeks / weeks in active span")
 }
 
 # ---- |-Quality 2: typing test volume (country x season) ----
@@ -129,10 +143,60 @@ fig_syndromic_dynamics = function(timeseries_long){
                       y_lab="Consultation rate", colour_lab="Indicator")
 }
 
+# ---- |-Dynamics 4: timing-aligned ILI+ (countries stacked on a shared time axis) ----
+# one country per row, all sharing the same x (time) axis, so peaks line up vertically and
+# the relative timing of waves across countries (and pathogens) is read off at a glance.
+fig_iliplus_aligned = function(timeseries_long){
+  df = timeseries_long %>%
+    filter(indicator=="ili_plus", stream=="ili_plus_sentinel", agegroup=="age_total")
+  ggplot2::ggplot(df, ggplot2::aes(date, value, colour=pathogen)) +
+    ggplot2::geom_line(na.rm=TRUE, linewidth=0.4) +
+    ggplot2::facet_grid(country_short ~ ., scales="free_y", switch="y") +
+    ggplot2::scale_colour_manual(values=pathogen_colours, na.value="grey60") +
+    ggplot2::labs(title="ILI+ timing aligned across countries (shared time axis)",
+                  x=NULL, y="ILI+", colour="Pathogen") +
+    theme_eyeball(base_size=12) +
+    ggplot2::theme(strip.text.y.left=ggplot2::element_text(angle=0),
+                   axis.text.y=ggplot2::element_blank(), panel.grid.major.y=ggplot2::element_blank())
+}
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+### Supplement figure builders (extra views worth keeping handy) ##########
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+# ---- |-Supplement: age-specific ILI consultation rate ----
+fig_age_dynamics = function(timeseries_long){
+  df = timeseries_long %>%
+    filter(stream=="ili_ari", indicator=="ILIconsultationrate", agegroup!="age_total")
+  facet_country_lines(df, colour_var="agegroup",
+                      title="Age-specific ILI consultation rate",
+                      y_lab="ILI consultation rate", colour_lab="Age group")
+}
+
+# ---- |-Supplement: influenza ILI+ from each source/stream (do they agree?) ----
+fig_iliplus_source_compare = function(timeseries_long){
+  df = timeseries_long %>%
+    filter(indicator=="ili_plus", pathogen=="Influenza", agegroup=="age_total",
+           stream %in% c("ili_plus_sentinel", "ili_plus_nonsentinel", "ili_plus_respicompass"))
+  facet_country_lines(df, colour_var="stream",
+                      title="Influenza ILI+ by source: sentinel vs non-sentinel vs RespiCompass",
+                      y_lab="ILI+ (Influenza)", colour_lab="Source / stream")
+}
+
+# ---- |-Supplement: detection counts by pathogen (sentinel) ----
+fig_detections_dynamics = function(timeseries_long){
+  df = timeseries_long %>%
+    filter(indicator=="detections", stream=="typing_sentinel", agegroup=="age_total")
+  facet_country_lines(df, colour_var="pathogen",
+                      title="Sentinel detection counts by pathogen",
+                      y_lab="Detections", colour_lab="Pathogen", colours=pathogen_colours)
+}
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ### eyeballing(): assemble the figure manifest ##########
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Returns list(meta, figures); each figure = list(title, subtitle, bullets, plot).
+# Returns list(meta, figures); each figure = list(section, title, subtitle, bullets, plot).
+# section is one of "quality" / "dynamics" / "supplement" so the report can group them.
 # countries / seasons default to everything present in the data.
 eyeballing = function(models_in, params=NULL, data=NULL, countries=NULL, seasons=NULL){
   long    = models_in$data_timeseries_long
@@ -147,20 +211,24 @@ eyeballing = function(models_in, params=NULL, data=NULL, countries=NULL, seasons
 
     # ---- quality figures ----
     completeness = list(
-      title    = "Data completeness across countries and seasons",
-      subtitle = "Fraction of in-season weeks with a reported value, by indicator (pooled over age).",
+      section  = "quality",
+      title    = "Season-window completeness across countries and seasons",
+      subtitle = paste("Definition: weeks with a non-missing value / number of ISO (Wednesday) weeks in the full Aug-Jul season.",
+                       "A reported 0 counts as observed; positivity needs both detections and tests.",
+                       "Caveat: the off-season is in the denominator, so winter-only streams cap well below 100% even when fully reported - compare with the active-span version in the supplement."),
       bullets  = c(
-        "ILI/ARI consultation rates are the most complete streams; most countries report the large majority of weeks in recent seasons. *(placeholder — edit)*",
+        "ILI/ARI consultation rates are the most complete streams; most countries report the large majority of in-season weeks recently. *(placeholder — edit)*",
         "Typing positivity is patchier and uneven across countries; several show large gaps in one or more seasons. *(placeholder — edit)*",
         "Pre-2020 seasons carry no SARS-CoV-2 or RSV typing — those blanks are expected, not missing data. *(placeholder — edit)*",
-        "Country x season cells near zero are candidates to exclude from modelling. *(placeholder — edit)*"
+        "Values plateau near ~45-50% for cleanly-reported winter streams: that is the off-season denominator, not poor reporting. *(placeholder — edit)*"
       ),
       plot     = fig_completeness(summary)
     ),
 
     testing_volume = list(
+      section  = "quality",
       title    = "Typing test volume by country and season",
-      subtitle = "Total specimens tested per season (log scale); a proxy for how trustworthy positivity is.",
+      subtitle = "Definition: total specimens tested per season (sum of weekly sentinel/non-sentinel tests), log colour scale. Zero/absent = grey. A proxy for how trustworthy the positivity (and hence ILI+) estimates are.",
       bullets  = c(
         "Sentinel testing volumes are typically smaller and noisier than non-sentinel. *(placeholder — edit)*",
         "Very low season totals make positivity (and hence ILI+) unstable for those country/seasons. *(placeholder — edit)*",
@@ -171,8 +239,9 @@ eyeballing = function(models_in, params=NULL, data=NULL, countries=NULL, seasons
 
     # ---- temporal-dynamics figures ----
     iliplus_dynamics = list(
+      section  = "dynamics",
       title    = "ILI+ dynamics by pathogen",
-      subtitle = "ILI consultation rate x sentinel positivity, one panel per country, continuous time.",
+      subtitle = "ILI consultation rate x sentinel positivity, one panel per country, continuous time (free y-axis per country).",
       bullets  = c(
         "Influenza ILI+ shows the classic sharp winter wave in most countries. *(placeholder — edit)*",
         "SARS-CoV-2 ILI+ appears from 2020/21 with less regular, multi-peak timing. *(placeholder — edit)*",
@@ -182,7 +251,20 @@ eyeballing = function(models_in, params=NULL, data=NULL, countries=NULL, seasons
       plot     = fig_iliplus_dynamics(long)
     ),
 
+    iliplus_aligned = list(
+      section  = "dynamics",
+      title    = "ILI+ timing aligned across countries",
+      subtitle = "Same ILI+ series, but countries stacked in a single column on one shared time axis so wave timing lines up vertically for cross-country comparison (y-axis free and hidden; read timing, not magnitude).",
+      bullets  = c(
+        "Read vertically: a near-vertical alignment of peaks means countries waved synchronously that season. *(placeholder — edit)*",
+        "Look for west-to-east or north-to-south lags in the influenza peak. *(placeholder — edit)*",
+        "RSV (orange) consistently sitting left of influenza (green) confirms its earlier seasonal onset. *(placeholder — edit)*"
+      ),
+      plot     = fig_iliplus_aligned(long)
+    ),
+
     positivity_dynamics = list(
+      section  = "dynamics",
       title    = "Test positivity by pathogen",
       subtitle = "Sentinel positivity (detections / tests) per pathogen, one panel per country.",
       bullets  = c(
@@ -194,6 +276,7 @@ eyeballing = function(models_in, params=NULL, data=NULL, countries=NULL, seasons
     ),
 
     syndromic_dynamics = list(
+      section  = "dynamics",
       title    = "Syndromic consultation rates: ILI vs ARI",
       subtitle = "Raw ERVISS consultation rates, one panel per country.",
       bullets  = c(
@@ -202,6 +285,52 @@ eyeballing = function(models_in, params=NULL, data=NULL, countries=NULL, seasons
         "These raw rates are the syndromic backbone every ILI+ series is built on. *(placeholder — edit)*"
       ),
       plot     = fig_syndromic_dynamics(long)
+    ),
+
+    # ---- supplement figures (recommended extras) ----
+    completeness_active = list(
+      section  = "supplement",
+      title    = "Active-span completeness across countries and seasons",
+      subtitle = paste("Definition: weeks with a non-missing value / number of weeks between the first and last reported week (inclusive).",
+                       "Unlike season-window completeness this ignores the off-season and instead measures gaps WITHIN each stream's active reporting period: ~100% means no mid-season holes."),
+      bullets  = c(
+        "Most consultation-rate streams approach 100% here — confirming the low season-window values are off-season, not gaps. *(placeholder — edit)*",
+        "Streams that stay low even on this measure have genuine mid-season reporting holes. *(placeholder — edit)*"
+      ),
+      plot     = fig_completeness_active(summary)
+    ),
+
+    iliplus_source_compare = list(
+      section  = "supplement",
+      title    = "Influenza ILI+ by source (sentinel vs non-sentinel vs RespiCompass)",
+      subtitle = "Three independent constructions of influenza ILI+ overlaid per country; close agreement is reassuring, divergence flags a source/definition issue.",
+      bullets  = c(
+        "The sentinel ILI+ should track the RespiCompass ILI+ closely (same construction). *(placeholder — edit)*",
+        "Non-sentinel ILI+ can differ in level where its testing population differs. *(placeholder — edit)*"
+      ),
+      plot     = fig_iliplus_source_compare(long)
+    ),
+
+    age_dynamics = list(
+      section  = "supplement",
+      title    = "Age-specific ILI consultation rate",
+      subtitle = "ERVISS ILI consultation rate by age group, one panel per country (age_total excluded).",
+      bullets  = c(
+        "Young children (0-4, 5-14) usually carry the highest ILI consultation rates. *(placeholder — edit)*",
+        "Age coverage is itself uneven across countries — some report only the total. *(placeholder — edit)*"
+      ),
+      plot     = fig_age_dynamics(long)
+    ),
+
+    detections_dynamics = list(
+      section  = "supplement",
+      title    = "Sentinel detection counts by pathogen",
+      subtitle = "Weekly sentinel detections per pathogen, one panel per country (counts, not rates).",
+      bullets  = c(
+        "Detection counts combine circulation and testing effort; pair with positivity and test volume. *(placeholder — edit)*",
+        "Useful for spotting which pathogen dominated a given season in absolute terms. *(placeholder — edit)*"
+      ),
+      plot     = fig_detections_dynamics(long)
     )
   )
 

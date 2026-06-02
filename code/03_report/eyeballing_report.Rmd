@@ -79,6 +79,16 @@ eb$figures$iliplus_dynamics$plot
 print_findings(eb$figures$iliplus_dynamics)
 ```
 
+## `r eb$figures$iliplus_aligned$title`
+
+```{r iliplus-aligned, fig.width=15, fig.height=22}
+eb$figures$iliplus_aligned$plot
+```
+
+```{r iliplus-aligned-bullets, results="asis"}
+print_findings(eb$figures$iliplus_aligned)
+```
+
 ## `r eb$figures$positivity_dynamics$title`
 
 ```{r positivity, fig.width=18, fig.height=12}
@@ -97,4 +107,49 @@ eb$figures$syndromic_dynamics$plot
 
 ```{r syndromic-bullets, results="asis"}
 print_findings(eb$figures$syndromic_dynamics)
+```
+
+# Supplement
+
+Additional views worth keeping handy: an alternative completeness measure that ignores the
+off-season, a cross-source ILI+ consistency check, age structure, and raw detection counts.
+
+## `r eb$figures$completeness_active$title`
+
+```{r completeness-active, fig.width=15, fig.height=10}
+eb$figures$completeness_active$plot
+```
+
+```{r completeness-active-bullets, results="asis"}
+print_findings(eb$figures$completeness_active)
+```
+
+## `r eb$figures$iliplus_source_compare$title`
+
+```{r iliplus-source, fig.width=18, fig.height=12}
+eb$figures$iliplus_source_compare$plot
+```
+
+```{r iliplus-source-bullets, results="asis"}
+print_findings(eb$figures$iliplus_source_compare)
+```
+
+## `r eb$figures$age_dynamics$title`
+
+```{r age, fig.width=18, fig.height=12}
+eb$figures$age_dynamics$plot
+```
+
+```{r age-bullets, results="asis"}
+print_findings(eb$figures$age_dynamics)
+```
+
+## `r eb$figures$detections_dynamics$title`
+
+```{r detections, fig.width=18, fig.height=12}
+eb$figures$detections_dynamics$plot
+```
+
+```{r detections-bullets, results="asis"}
+print_findings(eb$figures$detections_dynamics)
 ```
