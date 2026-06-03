@@ -119,6 +119,8 @@ load_data_epi = function(data=list(), params=NULL, regenerate=FALSE, new_from_on
         raw_i = read_csv(file=snapshot_path, show_col_types = FALSE)
       }
       # add date, recode age, add country code (and slim down if it is a rate table)
+      check_required_columns(raw_i, erviss_required_cols(reg_i$schema),
+                             paste0("ERVISS '", reg_i$name, "' (", reg_i$file, ")"))  # fail loudly on upstream column changes
       epi[[reg_i$name]] = standardise_erviss(raw_i, schema=reg_i$schema)
     }
 

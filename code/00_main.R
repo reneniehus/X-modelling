@@ -9,6 +9,7 @@ source("code/02_settings/settings_version0.R"); params=settings() # settings_ver
 
 # ---- |-sourcing support scripts ----
 source("code/01_main_supporting/flu_functions.R")
+source("code/01_main_supporting/validate.R")
 source("code/01_main_supporting/load_data.R")
 source("code/01_main_supporting/gen_model_input.R")
 source("code/01_main_supporting/eyeballing.R")
@@ -27,12 +28,11 @@ models_out = run_model( params, data , models_in ) # runs the model scripts
 # ---- |-process and save model output ----
 
 # ---- |-report ----
-
-# ---- |-Run special analyses ("code/04_special_analyses/")
+# render the data-eyeballing report: rmarkdown::render("code/03_report/eyeballing_report.Rmd")
 
 # ---- |-The end
 # (temporary code for any quick checking)
-models_in$data_timeseries_long 
+models_in$data_timeseries_long
 models_in$data_season_summary
 
-eyeballing(models_in, params, data, countries=NULL, seasons=NULL, interactive=F)
+eb = eyeballing(models_in, params, data) # quality + dynamics figure manifest (see eyeballing.R)

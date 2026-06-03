@@ -97,6 +97,9 @@ extract_iliari = function(data, params){
 # denominator) is the row where pathogentype == pathogen: "Influenza"/total, "RSV"/RSV,
 # "SARS-CoV-2"/SARS-CoV-2 -- the finer pathogentype/subtype rows only carry detections.
 extract_typing = function(epi_key, stream, data, params){
+  check_required_columns(data$epi[[epi_key]],                        # typing needs the pathogen breakdown
+                         c("pathogen", "pathogentype", "pathogensubtype", "age", "indicator", "value"),
+                         paste0("data$epi$", epi_key))
   wide = data$epi[[epi_key]] %>%
     filter(pathogentype == pathogen, age == "age_total",
            indicator %in% c("detections", "tests")) %>%

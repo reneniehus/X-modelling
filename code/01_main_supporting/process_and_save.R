@@ -7,7 +7,6 @@ process_and_save = function(params=NULL, data=NULL, models_out=NULL,save_submiss
   df_data_summaries = NULL
   for (i in 1:length(models_out$mout)) {
     i_country = names(models_out$mout)[i]
-    browser()
     i_country_long = names(models_out$mout)[i] %>% EU_long()
     pr=paste(i_country_long,"\n"); cat(green(pr))
     # parameter estimates
