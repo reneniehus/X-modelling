@@ -146,15 +146,20 @@ fig_syndromic_dynamics = function(timeseries_long){
 # ---- |-Dynamics 4: timing-aligned ILI+ (countries stacked on a shared time axis) ----
 # one country per row, all sharing the same x (time) axis, so peaks line up vertically and
 # the relative timing of waves across countries (and pathogens) is read off at a glance.
+# Each country x pathogen curve is rescaled to its own peak (=1) so only TIMING is visible,
+# not magnitude (a small RSV wave and a large flu wave both reach the top of the panel).
 fig_iliplus_aligned = function(timeseries_long){
   df = timeseries_long %>%
-    filter(indicator=="ili_plus", stream=="ili_plus_sentinel", agegroup=="age_total")
+    filter(indicator=="ili_plus", stream=="ili_plus_sentinel", agegroup=="age_total") %>%
+    mutate(.by = c(country_short, pathogen),
+           value = { peak = suppressWarnings(max(value, na.rm=TRUE))   # per country x pathogen peak
+                     if (!is.finite(peak) || peak <= 0) NA_real_ else value / peak })
   ggplot2::ggplot(df, ggplot2::aes(date, value, colour=pathogen)) +
     ggplot2::geom_line(na.rm=TRUE, linewidth=0.4) +
-    ggplot2::facet_grid(country_short ~ ., scales="free_y", switch="y") +
+    ggplot2::facet_grid(country_short ~ ., switch="y") +
     ggplot2::scale_colour_manual(values=pathogen_colours, na.value="grey60") +
-    ggplot2::labs(title="ILI+ timing aligned across countries (shared time axis)",
-                  x=NULL, y="ILI+", colour="Pathogen") +
+    ggplot2::labs(title="ILI+ timing aligned across countries (each curve scaled to its own peak)",
+                  x=NULL, y="ILI+ (scaled to peak = 1, per country & pathogen)", colour="Pathogen") +
     theme_eyeball(base_size=12) +
     ggplot2::theme(strip.text.y.left=ggplot2::element_text(angle=0),
                    axis.text.y=ggplot2::element_blank(), panel.grid.major.y=ggplot2::element_blank())
@@ -254,7 +259,7 @@ eyeballing = function(models_in, params=NULL, data=NULL, countries=NULL, seasons
     iliplus_aligned = list(
       section  = "dynamics",
       title    = "ILI+ timing aligned across countries",
-      subtitle = "Same ILI+ series, but countries stacked in a single column on one shared time axis so wave timing lines up vertically for cross-country comparison (y-axis free and hidden; read timing, not magnitude).",
+      subtitle = "Same ILI+ series, but countries stacked in a single column on one shared time axis, and each country x pathogen curve rescaled to its own peak (=1). This removes magnitude so only wave timing remains: a small RSV wave and a large influenza wave both reach the top of the panel.",
       bullets  = c(
         "Read vertically: a near-vertical alignment of peaks means countries waved synchronously that season. *(placeholder — edit)*",
         "Look for west-to-east or north-to-south lags in the influenza peak. *(placeholder — edit)*",
