@@ -32,7 +32,4 @@ models_out = run_model( params, data , models_in ) # runs the model scripts
 
 # ---- |-The end
 # (temporary code for any quick checking)
-models_in$data_timeseries_long
-models_in$data_season_summary
-
 eb = eyeballing(models_in, params, data) # quality + dynamics figure manifest (see eyeballing.R)
