@@ -23,6 +23,7 @@ output/*.rds
 # ---- generated reports & knit artifacts ----
 code/03_report/*.html
 code/03_report/figure/
+documentation/*.html
 figure/
 
 # ---- model output / large files written outside the repo ----

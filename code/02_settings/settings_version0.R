@@ -7,9 +7,15 @@ settings = function() {
   # debug/fast modes
   params$rapid_stan_fit = T # T: runs scripts with settings that reduce run-time
   
-  # ---- |-Resport setting ----
-  params$send_report = T
-  params$report_recipients = c('rene.niehus@ecdc.europa.eu')
+  # ---- |-Report email settings (used by send_report(); off by default) ----
+  params$send_report       = FALSE                       # TRUE: email the rendered report
+  params$report_from       = "you@example.org"           # sender address
+  params$report_recipients = c("you@example.org")        # one or more recipients
+  params$report_subject    = "Model run complete"
+  params$report_attachments= c("code/03_report/eyeballing_report.html") # files to attach (missing ones skipped)
+  params$smtp_host         = ""                           # your SMTP server, e.g. "smtp.example.org"
+  params$smtp_port         = 25
+  params$smtp_insecure     = TRUE
   
   # ---- |-Names/identifiers ----
   params$four_age_groups = c("0-4","5-14","15-64","65+") # the order is important
