@@ -65,6 +65,4 @@ documentation/                 data_overview.md, quickstart.md
 
 ## Reproducibility
 
-`renv.lock` pins all dependencies; `renv::restore()` reproduces the environment. On Claude Code
-web sessions a `SessionStart` hook installs system libraries and hydrates the renv library
-offline (`.claude/hooks/session-start.sh`).
+`renv.lock` pins all dependencies; `renv::restore()` reproduces the environment.
