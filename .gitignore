@@ -18,6 +18,7 @@ renv/staging/
 output/*.Rdata
 output/*.csv
 output/*.rds
+output/*.png
 !output/.gitkeep
 
 # ---- generated reports & knit artifacts ----
