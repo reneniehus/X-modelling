@@ -37,8 +37,7 @@ See `documentation/quickstart.md` (how to run) and
     `data_timeseries_wide`, `data_season_summary`.
 -   Multi-pathogen ILI+ (Influenza / SARS-CoV-2 / RSV) and data-quality
     measures.
--   Contact, vaccine and demography data; the ECDC SQL demography client
-    (dormant by default).
+-   Contact, vaccine and demography data (from committed snapshots).
 
 ## Out of scope (for production now)
 

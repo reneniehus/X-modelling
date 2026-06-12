@@ -34,7 +34,7 @@ settings = function() {
   # data-loading settings (consumed by code/01_main_supporting/load_data.R)
   params$respicompass_round = "2024-2025_round_1" # RespiCompass hub round folder; bump this for a new season
   params$demography_year = 2024 # ReportYear used when querying the ECDC population database
-  params$use_ecdc_db = FALSE # T: pull demography live from the ECDC internal SQL DB (only inside the ECDC network); F: use the committed snapshot
+  params$use_ecdc_db = FALSE # keep FALSE: demography comes from the committed snapshot (the ECDC SQL client is not part of this repo)
 
   # ---- |-Simulations ----
   params$simulation_seed = 12

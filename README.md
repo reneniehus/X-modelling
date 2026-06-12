@@ -1,70 +1,85 @@
-# X-modelling
+# flu-susceptible-fit
 
-A clone-and-go R template for standing up a respiratory-virus modelling project quickly —
-public-health emergency or routine season. It ships a working data layer (ECDC ERVISS +
-RespiCompass surveillance, contacts, vaccination, demography), tidy model-ready tables, a
-data-quality / dynamics report, input-data validation, tests, and a pinned environment, so a
-new project starts from a running pipeline rather than a blank repo.
+Fitting **flu ILI+** with a susceptible-reconstruction **SIR model**, in two flavours:
+
+- **Bayesian SIR (Stan)** — `stan/SIR_multiseason_age_vax_2.stan`: an age- and vaccination-structured,
+  multi-season SIR fit by HMC (rstan), with scenario projections.
+- **Extended Kalman Filter SIR (R)** — `code/01_main_supporting/model_kalman_sir.R`: the same
+  generative model (SIR → ILI+, neg-binomial-like noise) fit with an EKF likelihood and
+  `optim()` (MAP), entirely in base R — fast and dependency-light.
+
+The repo also carries the full data layer it builds on: ECDC **ERVISS** + **RespiCompass**
+surveillance (ILI/ARI, typing/positivity), contact matrices, vaccination and demography, turned
+into tidy model-ready tables, with a data-quality / dynamics report.
 
 ## Quick start
 
 ```r
-renv::restore()                       # install the pinned dependencies (see renv.lock)
-source("code/00_main.R")              # run the pipeline end to end
+renv::restore()                       # install pinned dependencies (renv.lock)
+source("code/00_main.R")              # build the data and model inputs
 ```
 
-`code/00_main.R` is the entry point. In order it:
+Then fit the EKF-SIR to one country/season of flu ILI+:
 
-1. loads settings (`code/02_settings/settings_version0.R` → `params`),
-2. `load_data(params)` → the `data` list (raw, per-source streams),
-3. `gen_model_input(params, data)` → `models_in` (canonical long / wide / season-summary tables),
-4. `eyeballing(models_in, params, data)` → a figure manifest for the report,
-5. `run_model(...)` → modelling scaffold to fill in per project.
+```r
+source("code/01_main_supporting/model_kalman_sir.R")
+s   <- kalman_sir_series(models_in, "DK", "2023/2024")   # weekly flu ILI+
+fit <- fit_kalman_sir(s$value, infectious_period_days = 3)
+fit$params                            # R0, S0 (initial susceptible), I0, c, b, phi, qI
+kalman_sir_trajectory(fit)            # deterministic curve; n_weeks > length(y) projects forward
+```
 
-Two flags control loading: `regenerate` (rebuild the `output/*.Rdata` caches) and
-`new_from_online` (refetch from the internet vs. use the committed `data/` snapshots — the
-snapshots let a fresh clone run fully offline).
+Demo that fits two countries (Denmark, Greece) and saves a figure:
 
-## What you'll edit first
+```sh
+Rscript code/04_modelling/fit_kalman_sir_demo.R     # -> output/kalman_sir_fit.png
+```
 
-- **`code/02_settings/settings_version0.R`** — countries, season window, data round, report
-  email. Copy to `settings_version1.R` to version a new configuration.
-- **`code/01_main_supporting/gen_model_input.R`** — add extractors / `+`-indicators.
-- **`code/01_main_supporting/run_model.R`** — wire in a model (parked `model_*.R` templates:
-  SIR, ARIMA, last-year-burden).
+## The model in one paragraph
+
+A latent SIR in population proportions (`dS/dt = -beta S I`, `dI/dt = beta S I - gamma I`) drives
+weekly ILI+, which is taken proportional to weekly new infections (`E[y] = c · new infections + b`,
+with `b` a small off-season baseline). Observation noise is neg-binomial-like (`Var = mu + mu²/phi`).
+The EKF linearises the one-week SIR map to propagate a Gaussian state and compute the likelihood;
+weakly-informative priors regularise the classic SIR identifiability degeneracies (R0→∞ with S0→0).
+Fitted R0 ≈ 1.1–1.8 and initial-susceptible fractions reproduce observed waves well (correlation
+~0.8–0.97 across the test countries); a single-season SIR does not capture secondary strain waves,
+by design.
 
 ## Tests
 
-Lightweight contracts (`code/01_main_supporting/validate.R`) fail loudly if an upstream source
-renames or drops a required column. Run the suite offline from the committed snapshots:
-
 ```r
-Rscript run_tests.R
+Rscript run_tests.R                   # offline, from the committed data/ snapshots
 ```
+
+Checks the data contracts, the canonical tables, and the model: that the EKF-SIR fit converges
+with epidemiologically plausible parameters and reproduces the observed flu ILI+ wave
+(`tests/testthat/test-kalman-sir.R`).
 
 ## Layout
 
 ```
-code/00_main.R                 orchestrator (run this)
+code/00_main.R                 build data + model inputs
 code/01_main_supporting/       setup, validate, load_data, gen_model_input, eyeballing,
-                               run_model, process_and_save, send_report, model_* scaffolds
+                               model_kalman_sir (EKF-SIR), model_* scaffolds
 code/02_settings/              settings_version0.R (params)
-code/03_report/                eyeballing_report.Rmd
-data/                          committed raw snapshots (offline bootstrap)
-output/                        cached data lists (gitignored, regenerated)
-db/                            ECDC SQL client (dormant unless params$use_ecdc_db = TRUE)
-tests/testthat/                contract + invariant tests
+code/03_report/                eyeballing_report.Rmd (data-quality / dynamics report)
+code/04_modelling/             fit_kalman_sir_demo.R
+stan/                          SIR_multiseason_age_vax_2.stan (Bayesian SIR)
+data/                          committed ERVISS / RespiCompass snapshots (offline bootstrap)
+output/                        cached data lists + figures (gitignored, regenerated)
+tests/testthat/                contract + model tests
 documentation/                 data_overview.md, quickstart.md
 ```
 
-## Docs
-
-- [`documentation/quickstart.md`](documentation/quickstart.md) — fuller getting-started guide.
-- [`documentation/data_overview.md`](documentation/data_overview.md) — the data streams and tables.
-- [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md) — what's in scope and the production path.
-
 ## Reproducibility
 
-`renv.lock` pins all dependencies; `renv::restore()` reproduces the environment. On Claude Code
-web sessions a `SessionStart` hook installs system libraries and hydrates the renv library
-offline (`.claude/hooks/session-start.sh`).
+`renv.lock` pins all dependencies (R 4.3.3); `renv::restore()` reproduces the environment.
+Data is public ECDC ERVISS / RespiCompass surveillance data. See `documentation/quickstart.md`
+and `documentation/data_overview.md` for more.
+
+## Note on the Stan model
+
+The Stan model's priors are currently commented out and a few generated-quantities lines need a
+fix (see the review notes in commit history); re-enable/repair them before production HMC use. The
+EKF-SIR includes the equivalent priors as `optim` penalties and is the ready-to-run path.

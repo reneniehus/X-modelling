@@ -34,8 +34,9 @@ Edit `code/02_settings/settings_version0.R` (the `params` list). Common knobs:
 - `run_countries` — countries to focus on.
 - `season_start_monthday` / `season_end_monthday`, `latest_start_year` — season window.
 - `respicompass_round` — RespiCompass hub round folder (bump for a new season).
-- `use_ecdc_db` — `TRUE` (only inside the ECDC network) to pull demography live from the
-  ECDC SQL database instead of the committed snapshot.
+
+Demography comes from the committed snapshot (`data/population_pyramid.fst`); keep
+`use_ecdc_db = FALSE`.
 
 To version a different configuration, copy the file to `settings_version1.R` and source that.
 
@@ -67,8 +68,8 @@ It checks the data contracts, the canonical tables, and the key invariant
 ## 8. Modelling
 `run_model.R` is an intentionally empty orchestration stub; `model_*.R` in
 `code/01_main_supporting/` are parked single-model templates (SIR, ARIMA, last-year-burden)
-to graduate into production when a project needs them. `db/` holds the ECDC SQL client
-(kept dormant). The contact-matrix transform lives in `flu_functions.R`.
+to graduate into production when a project needs them. The contact-matrix transform lives in
+`flu_functions.R`.
 
 Two worked SIR implementations of the same flu ILI+ model are included:
 
@@ -99,7 +100,6 @@ code/04_modelling/             fit_kalman_sir_demo.R
 stan/                          SIR_multiseason_age_vax_2.stan (Bayesian SIR)
 data/                          committed raw snapshots (offline bootstrap)
 output/                        cached data lists (gitignored, regenerated)
-db/                            ECDC SQL client (dormant)
 tests/testthat/                contract + invariant tests
 documentation/                 data_overview.md, quickstart.md
 ```

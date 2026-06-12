@@ -35,7 +35,7 @@ Source: <https://github.com/EU-ECDC/Respiratory_viruses_weekly_data>.
 | `data$contact` | per-country synthetic contact matrices (list) | Prem et al. (shipped in `data/`) |
 | `data$helpers_respicompass` | `iso2_code`, `iso_weeks` lookup tables | RespiCompass |
 | `data$demography_respicast` | `population_pyramid`, `population_pyramid_fine` | RespiCompass |
-| `data$demography_ECDC` | `population_pyramid` | ECDC SQL DB (dormant; `params$use_ecdc_db`) |
+| `data$demography_ECDC` | `population_pyramid` | committed snapshot `data/population_pyramid.fst` |
 
 ## `models_in` — tidy, model/plot-ready tables (`gen_model_input()`)
 

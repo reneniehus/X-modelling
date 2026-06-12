@@ -253,47 +253,14 @@ load_data_demography_ECDC = function(data=list(), params=NULL, regenerate=FALSE,
 
   build_demography_ECDC = function(){
     if (new_from_online==T) {
-      # ---- query the ECDC internal SQL database (reachable only inside the ECDC network) ----
-      # dormant by default; activated via params$use_ecdc_db (see load_data()).
-      pr=paste("Loading demography data from ECDC database ... \n"); cat(green(pr))
-      source(here('db/logger.R'))
-      source(here('db/sql_utils.R'))
-      logger <- forge_logger()(logLevel = 'INFO')   # logger is needed for running the SQL utils
-      dbDir <- 'db/'                                 # where the SQL connection profiles live (always needed)
-      SQLTemplatePath <- 'db/templates/sql/'         # where the SQL templates live (only if using them)
-      report_year = if (!is.null(params$demography_year)) params$demography_year else 2024
-      pop_data <- read_data(table = 'out.DM_Population_ByCountryEU', connInfo = 'pop')
-      pop_data %>% as_tibble() %>%
-        filter(ReportYear==report_year, CountryCode%in%countries_short) %>%
-        filter(AgeGroup %in% c("Age00_04",
-                               "Age05_09",
-                               "Age10_14",
-                               "Age15_19", # up to 16 years, single age brackets exist, too
-                               "Age20_24",
-                               "Age25_29",
-                               "Age30_34",
-                               "Age35_39",
-                               "Age40_44",
-                               "Age45_49",
-                               "Age50_54",
-                               "Age55_59",
-                               "Age60_64",
-                               "Age65_69",
-                               "Age70_74",
-                               "Age75_79",
-                               "Age80_84",
-                               "Age85_89",
-                               "Age90_94",
-                               "Age95+") ) %>%
-        group_by(country=CountryCode,age_group=AgeGroup) %>%
-        mutate(Population=as.numeric(Population)) %>%
-        summarise(population=sum(Population)) %>% ungroup() -> mdat
-      write_fst(mdat,path=here("data/population_pyramid.fst"))   # refresh the committed snapshot
-    } else {
-      # ---- read the committed snapshot (works without the ECDC network) ----
-      pr=paste("Loading demography data from disk ... \n"); cat(green(pr))
-      mdat = read_fst(path=here("data/population_pyramid.fst")) %>% as_tibble()
+      # The live ECDC SQL database (out.DM_Population_ByCountryEU) is reachable only inside the
+      # ECDC network; its client is not part of this repository. Use the committed snapshot.
+      stop("Live ECDC demography DB access is not available here; set params$use_ecdc_db=FALSE ",
+           "to use the committed data/population_pyramid.fst snapshot.")
     }
+    # ---- read the committed snapshot (works without the ECDC network) ----
+    pr=paste("Loading demography data from disk ... \n"); cat(green(pr))
+    mdat = read_fst(path=here("data/population_pyramid.fst")) %>% as_tibble()
 
     list(
       population_pyramid = mdat
