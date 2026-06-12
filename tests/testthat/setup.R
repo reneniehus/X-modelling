@@ -3,7 +3,7 @@
 library(here)
 suppressMessages(source(here("code/01_main_supporting/setup.R")))
 source(here("code/02_settings/settings_version0.R")); params <- settings()
-for (f in c("flu_functions", "validate", "load_data", "gen_model_input", "eyeballing"))
+for (f in c("flu_functions", "validate", "load_data", "gen_model_input", "eyeballing", "model_kalman_sir"))
   source(here(paste0("code/01_main_supporting/", f, ".R")))
 
 data      <- load_data(params, regenerate = FALSE, new_from_online = FALSE)

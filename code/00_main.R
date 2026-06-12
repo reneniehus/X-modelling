@@ -14,6 +14,7 @@ source("code/01_main_supporting/load_data.R")
 source("code/01_main_supporting/gen_model_input.R")
 source("code/01_main_supporting/eyeballing.R")
 source("code/01_main_supporting/run_model.R")
+source("code/01_main_supporting/model_kalman_sir.R") # EKF-SIR fit of flu ILI+ (R analogue of the Stan model)
 source("code/01_main_supporting/process_and_save.R")
 source("code/01_main_supporting/send_report.R")
 

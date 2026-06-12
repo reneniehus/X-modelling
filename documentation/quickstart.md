@@ -64,11 +64,29 @@ Rscript run_tests.R        # or: testthat::test_dir("tests/testthat")
 It checks the data contracts, the canonical tables, and the key invariant
 (`ILI+ == ILI × positivity`, and agreement with the RespiCompass ILI+).
 
-## 8. Modelling (lightweight scaffold)
+## 8. Modelling
 `run_model.R` is an intentionally empty orchestration stub; `model_*.R` in
 `code/01_main_supporting/` are parked single-model templates (SIR, ARIMA, last-year-burden)
 to graduate into production when a project needs them. `db/` holds the ECDC SQL client
 (kept dormant). The contact-matrix transform lives in `flu_functions.R`.
+
+Two worked SIR implementations of the same flu ILI+ model are included:
+
+- **`stan/SIR_multiseason_age_vax_2.stan`** — the full age- and vaccination-structured,
+  multi-season Bayesian SIR (HMC via rstan), with scenario projections. Note its priors are
+  currently commented out; re-enable them before production use.
+- **`code/01_main_supporting/model_kalman_sir.R`** — a single-population R re-implementation
+  fitting the same generative story (SIR → ILI+, neg-binomial-like noise) with an **Extended
+  Kalman Filter** for the likelihood and `optim()` (MAP, with weakly-informative priors) for
+  fitting. Everything is base R. Fit one country/season:
+  ```r
+  s   <- kalman_sir_series(models_in, "DK", "2023/2024")
+  fit <- fit_kalman_sir(s$value, infectious_period_days = 3)
+  fit$params                       # R0, S0, I0, c, b, phi, qI
+  kalman_sir_trajectory(fit)       # deterministic curve; n_weeks > length(y) projects forward
+  ```
+  Demo (fits two countries, saves a figure): `Rscript code/04_modelling/fit_kalman_sir_demo.R`.
+  Tested in `tests/testthat/test-kalman-sir.R`.
 
 ## Layout
 ```
@@ -77,6 +95,8 @@ code/01_main_supporting/       setup, validate, load_data, gen_model_input, eyeb
                                run_model, process_and_save, send_report, model_* scaffolds
 code/02_settings/              settings_version0.R (params)
 code/03_report/                eyeballing_report.Rmd
+code/04_modelling/             fit_kalman_sir_demo.R
+stan/                          SIR_multiseason_age_vax_2.stan (Bayesian SIR)
 data/                          committed raw snapshots (offline bootstrap)
 output/                        cached data lists (gitignored, regenerated)
 db/                            ECDC SQL client (dormant)
