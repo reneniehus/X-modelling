@@ -1,4 +1,4 @@
-# X-modelling
+# respi_starter
 
 A clone-and-go R template for standing up a respiratory-virus modelling project quickly —
 public-health emergency or routine season. It ships a working data layer (ECDC ERVISS +
