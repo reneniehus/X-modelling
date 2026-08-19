@@ -26,6 +26,7 @@ output/*.rds
 # ---- generated reports & knit artifacts ----
 code/03_report/*.html
 code/03_report/figure/
+code/03_report/eyeballing_report_files/
 documentation/*.html
 figure/
 
