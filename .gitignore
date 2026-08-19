@@ -1,3 +1,6 @@
+# ---- Claude Code session scratch (temporary worktrees, local settings) ----
+.claude/
+
 # ---- R session / IDE ----
 .Rproj.user/
 .Rhistory
