@@ -5,7 +5,7 @@ A clone-and-go template for loading ERVISS / RespiCompass respiratory-surveillan
 with a quality/dynamics report. See `data_overview.md` for what data is available.
 
 ## 1. Prerequisites
-- **R 4.3+** (the renv lockfile pins R 4.3.3 and 164 packages).
+- **R 4.3+** (the renv lockfile pins R 4.3.3 and 138 packages).
 - System libraries for two optional features: **pandoc** (to render the HTML report) and
   **libmagick++** (pulled in by `summarytools`). On Debian/Ubuntu:
   `apt-get install pandoc libmagick++-dev`.

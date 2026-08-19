@@ -224,19 +224,19 @@ load_data_helpers_respicompass = function(data=list(), params=NULL, regenerate=F
   build_helpers = function(){
     # fetch online when asked to, or when either snapshot is missing (self-bootstrapping)
     fetch_online = new_from_online==T |
-      !file.exists(here("output/respicompass_locations.csv")) |
-      !file.exists(here("output/respicompass_weeks.csv"))
+      !file.exists(here("data/respicompass_locations.csv")) |
+      !file.exists(here("data/respicompass_weeks.csv"))
     if (fetch_online) {
       pr=paste("Loading RespiCompass helpers from github ... \n"); cat(green(pr))
       xlocations = read_csv(respicompass_file("supporting-files/locations_iso2_codes.csv", params), show_col_types = F)
       xweeks     = read_csv(respicompass_file("supporting-files/iso_weeks.csv",            params), show_col_types = F)
-      # keep / refresh the local snapshots
-      xlocations %>% write_csv(file=here("output/respicompass_locations.csv"))
-      xweeks     %>% write_csv(file=here("output/respicompass_weeks.csv"))
+      # keep / refresh the committed snapshots (data/, like every other loader, so a fresh clone works offline)
+      xlocations %>% write_csv(file=here("data/respicompass_locations.csv"))
+      xweeks     %>% write_csv(file=here("data/respicompass_weeks.csv"))
     } else {
       pr=paste("Loading RespiCompass helpers from disk ... \n"); cat(green(pr))
-      xlocations = read_csv(here("output/respicompass_locations.csv"), show_col_types = F)
-      xweeks     = read_csv(here("output/respicompass_weeks.csv"),     show_col_types = F)
+      xlocations = read_csv(here("data/respicompass_locations.csv"), show_col_types = F)
+      xweeks     = read_csv(here("data/respicompass_weeks.csv"),     show_col_types = F)
     }
 
     list(
@@ -308,7 +308,7 @@ load_data_demography_respicast = function(data=list(), params=NULL, regenerate=F
 
   build_demography_respicast = function(){
     # fetch online when asked to, or when the snapshot is missing (self-bootstrapping)
-    fetch_online = new_from_online==T | !file.exists(here("output/population_pyramid_respicast.csv"))
+    fetch_online = new_from_online==T | !file.exists(here("data/population_pyramid_respicast.csv"))
     if (fetch_online) {
       # RespiCompass ships one population file per country (aggregated + fine age bands); loop and stack.
       if (is.null(data$helpers_respicompass)) {
@@ -323,13 +323,13 @@ load_data_demography_respicast = function(data=list(), params=NULL, regenerate=F
       }
       pop_df      = map_dfr(country_v, load_one_country, fine=FALSE) %>% select(country, age_group, population)
       pop_fine_df = map_dfr(country_v, load_one_country, fine=TRUE)  %>% select(country, age_group, population)
-      # keep / refresh the local snapshots
-      pop_df      %>% write_csv(here("output/population_pyramid_respicast.csv"))
-      pop_fine_df %>% write_csv(here("output/population_pyramid_fine_respicast.csv"))
+      # keep / refresh the committed snapshots (data/, like every other loader, so a fresh clone works offline)
+      pop_df      %>% write_csv(here("data/population_pyramid_respicast.csv"))
+      pop_fine_df %>% write_csv(here("data/population_pyramid_fine_respicast.csv"))
     } else {
       pr=paste("Loading respicast demography data from disk ... \n"); cat(green(pr))
-      pop_df      = read_csv(here("output/population_pyramid_respicast.csv"),      show_col_types = F)
-      pop_fine_df = read_csv(here("output/population_pyramid_fine_respicast.csv"), show_col_types = F)
+      pop_df      = read_csv(here("data/population_pyramid_respicast.csv"),      show_col_types = F)
+      pop_fine_df = read_csv(here("data/population_pyramid_fine_respicast.csv"), show_col_types = F)
     }
 
     list(
