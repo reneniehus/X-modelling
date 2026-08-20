@@ -33,3 +33,6 @@ figure/
 # ---- model output / large files written outside the repo ----
 output/*-forecast-hub/
 packrat/lib*/
+
+# Copyrighted reference PDFs stay local (public repo)
+lit/*.pdf
